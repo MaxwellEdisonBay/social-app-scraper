@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  scraper:
+    build:
+      context: .
+      dockerfile: scraper.Dockerfile
+#    volumes:
+#      - ./scraped_data:/app/scraped_data # Optional: Mount a volume for persistent data
+  cron:
+    build:
+      context: .
+      dockerfile: cron.Dockerfile
+    volumes:
+      - ./crontab:/etc/cron.d/crontab
+    depends_on:
+      - scraper # Ensure the scraper image is built first
