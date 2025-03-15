@@ -19,12 +19,13 @@ class WebCrawler:
         return soup
 
     def crawl(self, path):
-        url = f"{self.base_url}{path}"
-        html_content = self.fetch_page(url)
-        if html_content:
-            soup = self.parse_html(html_content)
-            # Add parsing logic here
-            return soup
+        # url = f"{self.base_url}{path}"
+        # html_content = self.fetch_page(url)
+        # if html_content:
+        #     soup = self.parse_html(html_content)
+        #     # Add parsing logic here
+        #     return soup
+        print("Do some crawling on "    + self.base_url + path)
         return None
 
 if __name__ == "__main__":

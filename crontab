@@ -1,2 +1,0 @@
-# crontab
-*/10 * * * * docker run --rm scraper_image
