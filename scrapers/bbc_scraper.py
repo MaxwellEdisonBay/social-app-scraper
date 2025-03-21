@@ -1,23 +1,13 @@
 import requests
 from bs4 import BeautifulSoup
 
-from scrapers.cache import ScraperCache
+from scrapers.base_scraper import BaseScraper
 from scrapers.models import Post
 
 
-class BBCScraper:
-    def __init__(self, enable_caching = True):
-        self.cache = ScraperCache()
-        self.enable_caching = enable_caching
+class BBCScraper(BaseScraper):
 
-    def fetch_updated_news(self) -> list[Post]:
-        news = self._get_bbc_us_canada_news()
-        if self.enable_caching:
-            new_posts = self.cache.add_posts(news)
-            return new_posts
-        return news
-
-    def _get_bbc_us_canada_news(self) ->  list[Post] | None:
+    def _get_latest_news(self) -> list[Post]:
         """
         Crawls the BBC News US & Canada page and extracts the latest news articles.
 
@@ -55,14 +45,13 @@ class BBCScraper:
 
         except requests.exceptions.RequestException as e:
             print(f"Error fetching URL: {e}")
-            return None
+            return []
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
-            return None
+            return []
 
 
 if __name__ == "__main__":
-
     scraper = BBCScraper()
     print(scraper.fetch_updated_news())
     print(scraper.fetch_updated_news())

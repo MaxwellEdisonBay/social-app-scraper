@@ -5,3 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    volumes:
+      - data_volume:/data  # Mounts the named volume to /data
+volumes:
+  data_volume:
