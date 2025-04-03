@@ -1,7 +1,10 @@
 import abc
+import requests
+from bs4 import BeautifulSoup
+from typing import Optional
 
 from scrapers.cache import ScraperCache
-from scrapers.models import Post
+from common.models.models import Post
 
 class BaseScraper:
     __metaclass__ = abc.ABCMeta
@@ -21,3 +24,17 @@ class BaseScraper:
     @abc.abstractmethod
     def _get_latest_news(self) -> list[Post]:
         return []
+
+    @abc.abstractmethod
+    def scrape_article(self, url: str) -> Optional[str]:
+        """
+        Scrapes the content of a specific news article.
+        Must be implemented by child classes to handle site-specific article scraping.
+        
+        Args:
+            url (str): The URL of the article to scrape
+            
+        Returns:
+            Optional[str]: The article text if successful, None if failed
+        """
+        pass

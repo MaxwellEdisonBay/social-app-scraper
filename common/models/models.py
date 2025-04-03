@@ -1,9 +1,12 @@
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass
 class Post:
-    def __init__(self, url: str, title: str, desc: str, image_url: str):
-        self.url = url
-        self.title = title
-        self.desc = desc
-        self.image_url = image_url
+    title: str
+    desc: str
+    url: str
+    image_url: Optional[str] = None
 
     def __str__(self):
         return f"""

@@ -1,7 +1,7 @@
 import pickle
 from collections import OrderedDict
 from os.path import exists
-from scrapers.models import Post
+from common.models.models import Post
 
 CACHE_MAX_SIZE = 100
 

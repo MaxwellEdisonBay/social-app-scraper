@@ -3,3 +3,5 @@ requests
 beautifulsoup4
 schedule
 sentence-transformers
+google-genai
+python-dotenv

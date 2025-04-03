@@ -2,11 +2,12 @@ from typing import List
 import pickle
 import os
 
-from scrapers.models import Post
+from common.models.models import Post
 
 
 class NewsQueue:
-    def __init__(self, cache_file='news_queue_cache.pkl', backlog_file='news_backlog_cache.pkl'):
+    def __init__(self, cache_file='news_queue_cache.pkl', backlog_file='news_backlog_cache.pkl', max_backlog_size=150):
+        self.max_backlog_size = max_backlog_size
         self.queue: List[Post] = []
         self.backlog: List[Post] = []
         self.cache_file = cache_file
@@ -35,6 +36,7 @@ class NewsQueue:
                 self.backlog.append(post)
             self.queue = []  # Clear the queue after processing
             self._save_cache()  # Clear the cache after processing
+            self._enforce_backlog_size()  # Enforce the maximum backlog size
             self._save_backlog()  # Save the backlog after processing
         else:
             print("No news in the queue to evaluate and post.")
@@ -65,10 +67,16 @@ class NewsQueue:
                 data = pickle.load(f)
             self.queue = [Post(**item.__dict__) for item in data]
 
+    def _enforce_backlog_size(self):
+        """Ensures the backlog does not exceed the maximum size by removing the oldest posts."""
+        if len(self.backlog) > self.max_backlog_size:
+            excess_count = len(self.backlog) - self.max_backlog_size
+            self.backlog = self.backlog[excess_count:]
+
 
 if __name__ == '__main__':
     # Mock Post class
-    from scrapers.models import Post
+    from common.models.models import Post
 
     # Create some mock existing posts
     existing_posts = [
