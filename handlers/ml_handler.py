@@ -2,6 +2,8 @@ import os
 from sentence_transformers import SentenceTransformer, util
 import sys
 from pathlib import Path
+import google.generativeai as genai
+from typing import List, Tuple, Optional
 
 # Add the project root to Python path
 project_root = str(Path(__file__).parent.parent)
@@ -9,8 +11,6 @@ if project_root not in sys.path:
     sys.path.append(project_root)
 
 from common.models.models import Post
-from google import genai
-from typing import List
 import json
 
 def filter_similar_posts(new_posts: list[Post], existing_posts: list[Post], threshold: float = 0.8) -> list[Post]:
