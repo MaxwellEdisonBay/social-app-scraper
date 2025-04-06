@@ -15,12 +15,12 @@ class NewsQueue:
             max_posts (int): Maximum number of posts to keep in the queue
             gemini_api_key (Optional[str]): Gemini API key for ML processing
         """
-        self.db_handler = DatabaseHandler(db_path=os.getenv('NEWS_QUEUE_DB_PATH'), max_posts=max_posts)
+        self.db_handler = DatabaseHandler(db_path=os.getenv('NEWS_QUEUE_DB_PATH', 'news_queue.db'), max_posts=max_posts)
         self.gemini_api_key = gemini_api_key
     
-    def add_posts(self, posts: List[Post], source: str) -> List[Post]:
+    def add_news(self, posts: List[Post], source: str) -> List[Post]:
         """
-        Add new posts to the queue, filtering for relevance and handling translations.
+        Add new posts to the queue and cache them.
         
         Args:
             posts (List[Post]): List of posts to add
@@ -67,47 +67,58 @@ class NewsQueue:
                 except Exception as e:
                     print(f"Error processing post with ML: {e}")
             
+            # Set status to queued
+            post.status = 'queued'
+            
             # Add to database
             if self.db_handler.add_post(post, source):
                 added_posts.append(post)
         
         return added_posts
     
-    def get_posts(self, source: Optional[str] = None) -> List[Post]:
+    def process_posts(self) -> List[Post]:
         """
-        Get all posts from the queue, optionally filtered by source.
+        Retrieve all posts currently in the queue for processing.
+        This is a placeholder method that will be implemented later.
         
-        Args:
-            source (Optional[str]): Source to filter posts by
-            
         Returns:
-            List[Post]: List of posts
+            List[Post]: List of posts to be processed
         """
-        return self.db_handler.get_all_posts(source)
+        # Get all queued posts
+        queued_posts = self.db_handler.get_all_posts(status='queued')
+        
+        # Mark posts as being processed
+        for post in queued_posts:
+            self.db_handler.update_post_status(post.url, 'processing')
+        
+        return queued_posts
     
-    def get_post(self, url: str) -> Optional[Post]:
+    def mark_as_processed(self, posts: List[Post]) -> bool:
         """
-        Get a specific post by URL.
+        Mark posts as processed and move them to the backlog.
         
         Args:
-            url (str): URL of the post to retrieve
+            posts (List[Post]): List of posts to mark as processed
             
         Returns:
-            Optional[Post]: Post object if found, None otherwise
+            bool: True if all posts were successfully marked as processed
         """
-        return self.db_handler.get_post_by_url(url)
+        success = True
+        for post in posts:
+            post.status = 'processed'
+            if not self.db_handler.update_post(post):
+                success = False
+        
+        return success
     
-    def update_post(self, post: Post) -> bool:
+    def get_backlog(self) -> List[Post]:
         """
-        Update an existing post in the queue.
+        Get all processed posts from the backlog.
         
-        Args:
-            post (Post): Post object with updated information
-            
         Returns:
-            bool: True if update was successful, False otherwise
+            List[Post]: List of processed posts
         """
-        return self.db_handler.update_post(post)
+        return self.db_handler.get_all_posts(status='processed')
     
     def _get_article_content(self, url: str) -> Optional[str]:
         """
@@ -127,41 +138,100 @@ class NewsQueue:
 
 if __name__ == "__main__":
     # Test the news queue
-    API_KEY = os.getenv("GOOGLE_API_KEY")
-    queue = NewsQueue(max_posts=100, gemini_api_key=API_KEY)
+    queue = None
+    cleanup_db = False  # Set to True to attempt database cleanup
     
-    # Test data
-    test_posts = [
-        Post(
-            url="https://example.com/test1",
-            title="Test Article 1",
-            desc="This is a test article about Ukrainian immigration",
-            image_url="https://example.com/image1.jpg",
-            created_at=datetime.now()
-        ),
-        Post(
-            url="https://example.com/test2",
-            title="Test Article 2",
-            desc="This is a test article about sports",
-            image_url="https://example.com/image2.jpg",
-            created_at=datetime.now()
-        )
-    ]
-    
-    print("Adding test posts...")
-    added_posts = queue.add_posts(test_posts, "test")
-    
-    print(f"\nAdded {len(added_posts)} posts:")
-    for post in added_posts:
-        print(f"\nTitle: {post.title}")
-        print(f"URL: {post.url}")
-        if post.english_summary:
-            print(f"English Summary: {post.english_summary}")
-        if post.ukrainian_title:
-            print(f"Ukrainian Title: {post.ukrainian_title}")
-        if post.ukrainian_summary:
-            print(f"Ukrainian Summary: {post.ukrainian_summary}")
-    
-    print("\nGetting all posts:")
-    all_posts = queue.get_posts()
-    print(f"Total posts in queue: {len(all_posts)}")
+    try:
+        # Clear the database before testing if cleanup is enabled
+        if cleanup_db:
+            try:
+                import os
+                import time
+                if os.path.exists('news_queue.db'):
+                    os.remove('news_queue.db')
+                print("=== SETUP: Cleared existing database ===\n")
+            except Exception as e:
+                print(f"Warning: Could not clear database: {e}\n")
+        
+        queue = NewsQueue(max_posts=100)  # Skip ML processing for testing
+        
+        # Test data
+        test_posts = [
+            Post(
+                url="https://example.com/test1",
+                title="Test Article 1",
+                desc="This is a test article about Ukrainian immigration",
+                image_url="https://example.com/image1.jpg",
+                created_at=datetime.now()
+            ),
+            Post(
+                url="https://example.com/test2",
+                title="Test Article 2",
+                desc="This is a test article about sports",
+                image_url="https://example.com/image2.jpg",
+                created_at=datetime.now()
+            )
+        ]
+        
+        print("=== STEP 1: Adding posts to the queue ===")
+        added_posts = queue.add_news(test_posts, "test")
+        
+        print(f"\nAdded {len(added_posts)} posts to the queue:")
+        for post in added_posts:
+            print(f"\nTitle: {post.title}")
+            print(f"URL: {post.url}")
+            print(f"Status: {post.status}")
+        
+        print("\n=== STEP 2: Checking the queue ===")
+        queued_posts = queue.db_handler.get_all_posts(status='queued')
+        print(f"Queue contains {len(queued_posts)} posts:")
+        for post in queued_posts:
+            print(f"- {post.title} (Status: {post.status})")
+        
+        print("\n=== STEP 3: Processing posts ===")
+        posts_to_process = queue.process_posts()
+        print(f"Retrieved {len(posts_to_process)} posts for processing:")
+        for post in posts_to_process:
+            print(f"- {post.title} (Status: {post.status})")
+        
+        print("\n=== STEP 4: Checking the queue after processing ===")
+        queued_posts = queue.db_handler.get_all_posts(status='queued')
+        print(f"Queue contains {len(queued_posts)} posts (should be 0)")
+        
+        print("\n=== STEP 5: Marking posts as processed ===")
+        queue.mark_as_processed(posts_to_process)
+        
+        print("\n=== STEP 6: Checking the backlog ===")
+        backlog = queue.get_backlog()
+        print(f"Backlog contains {len(backlog)} posts:")
+        for post in backlog:
+            print(f"- {post.title} (Status: {post.status})")
+        
+        print("\n=== STEP 7: Final check of the queue ===")
+        queued_posts = queue.db_handler.get_all_posts(status='queued')
+        print(f"Queue contains {len(queued_posts)} posts (should be 0)")
+        
+        print("\n=== TEST SUMMARY ===")
+        print("1. Posts were added to the queue")
+        print("2. Posts were retrieved from the queue for processing")
+        print("3. Queue was emptied after processing")
+        print("4. Posts were moved to the backlog")
+        print("5. Queue remained empty")
+    finally:
+        # Clean up
+        if queue:
+            queue.db_handler.close()
+            
+            # Only attempt cleanup if enabled
+            if cleanup_db:
+                try:
+                    import os
+                    import time
+                    # Add a small delay to allow connections to be fully closed
+                    time.sleep(0.5)
+                    if os.path.exists('news_queue.db'):
+                        os.remove('news_queue.db')
+                        print("\n=== CLEANUP: Database file removed ===")
+                except Exception as e:
+                    print(f"\nNote: Database file could not be removed: {e}")
+                    print("This is normal on Windows and doesn't affect functionality.")

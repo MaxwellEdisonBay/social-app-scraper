@@ -16,6 +16,9 @@ class Post:
     english_summary: Optional[str] = None
     ukrainian_title: Optional[str] = None
     ukrainian_summary: Optional[str] = None
+    
+    # Queue status
+    status: str = 'queued'  # Default status for new posts
 
     def __str__(self):
         return f"""
@@ -28,4 +31,5 @@ class Post:
         english_summary: {self.english_summary}
         ukrainian_title: {self.ukrainian_title}
         ukrainian_summary: {self.ukrainian_summary}
+        status: {self.status}
         """

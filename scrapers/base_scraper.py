@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-import os
 from typing import List, Optional
 from datetime import datetime
+import os
 from handlers.db_handler import DatabaseHandler
 from common.models.models import Post
 
@@ -16,7 +16,8 @@ class BaseScraper(ABC):
         """
         self.enable_caching = enable_caching
         self.max_posts = max_posts
-        self.db_handler = DatabaseHandler(db_path=os.getenv('DB_PATH'), max_posts=max_posts) if enable_caching else None
+        db_path = os.getenv('DB_PATH', 'news_cache.db')
+        self.db_handler = DatabaseHandler(db_path=db_path, max_posts=max_posts) if enable_caching else None
         self.source = self.__class__.__name__.lower().replace('scraper', '')
     
     @abstractmethod

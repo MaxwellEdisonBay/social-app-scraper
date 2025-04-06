@@ -32,7 +32,8 @@ class DatabaseHandler:
                     ukrainian_title TEXT,
                     ukrainian_summary TEXT,
                     created_at TIMESTAMP NOT NULL,
-                    source TEXT NOT NULL
+                    source TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'queued'
                 )
             ''')
             conn.commit()
@@ -78,8 +79,8 @@ class DatabaseHandler:
                     INSERT INTO posts (
                         url, title, desc, image_url, 
                         english_summary, ukrainian_title, ukrainian_summary,
-                        created_at, source
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        created_at, source, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     post.url,
                     post.title,
@@ -89,7 +90,8 @@ class DatabaseHandler:
                     post.ukrainian_title,
                     post.ukrainian_summary,
                     post.created_at or datetime.now(),
-                    source
+                    source,  # Store the source
+                    getattr(post, 'status', 'queued')  # Get status from post or default to 'queued'
                 ))
                 conn.commit()
                 return True
@@ -98,12 +100,13 @@ class DatabaseHandler:
             print(f"Database error: {e}")
             return False
     
-    def get_all_posts(self, source: Optional[str] = None) -> List[Post]:
+    def get_all_posts(self, source: Optional[str] = None, status: Optional[str] = None) -> List[Post]:
         """
-        Get all posts from the database, optionally filtered by source.
+        Get all posts from the database, optionally filtered by source and status.
         
         Args:
             source (Optional[str]): Source to filter posts by
+            status (Optional[str]): Status to filter posts by ('queued', 'processed', etc.)
             
         Returns:
             List[Post]: List of Post objects
@@ -112,23 +115,28 @@ class DatabaseHandler:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 
+                query = '''
+                    SELECT url, title, desc, image_url, 
+                           english_summary, ukrainian_title, ukrainian_summary,
+                           created_at, source, status
+                    FROM posts 
+                '''
+                params = []
+                
+                conditions = []
                 if source:
-                    cursor.execute('''
-                        SELECT url, title, desc, image_url, 
-                               english_summary, ukrainian_title, ukrainian_summary,
-                               created_at, source
-                        FROM posts 
-                        WHERE source = ?
-                        ORDER BY created_at DESC
-                    ''', (source,))
-                else:
-                    cursor.execute('''
-                        SELECT url, title, desc, image_url, 
-                               english_summary, ukrainian_title, ukrainian_summary,
-                               created_at, source
-                        FROM posts 
-                        ORDER BY created_at DESC
-                    ''')
+                    conditions.append("source = ?")
+                    params.append(source)
+                if status:
+                    conditions.append("status = ?")
+                    params.append(status)
+                
+                if conditions:
+                    query += " WHERE " + " AND ".join(conditions)
+                
+                query += " ORDER BY created_at DESC"
+                
+                cursor.execute(query, params)
                 
                 posts = []
                 for row in cursor.fetchall():
@@ -142,6 +150,9 @@ class DatabaseHandler:
                         ukrainian_summary=row[6],
                         created_at=datetime.fromisoformat(row[7])
                     )
+                    # Set source and status
+                    post.source = row[8]
+                    post.status = row[9]
                     posts.append(post)
                 return posts
                 
@@ -165,14 +176,14 @@ class DatabaseHandler:
                 cursor.execute('''
                     SELECT url, title, desc, image_url, 
                            english_summary, ukrainian_title, ukrainian_summary,
-                           created_at, source
+                           created_at, source, status
                     FROM posts 
                     WHERE url = ?
                 ''', (url,))
                 
                 row = cursor.fetchone()
                 if row:
-                    return Post(
+                    post = Post(
                         url=row[0],
                         title=row[1],
                         desc=row[2],
@@ -182,6 +193,9 @@ class DatabaseHandler:
                         ukrainian_summary=row[6],
                         created_at=datetime.fromisoformat(row[7])
                     )
+                    # Store the status as an attribute
+                    post.status = row[8]
+                    return post
                 return None
                 
         except sqlite3.Error as e:
@@ -205,7 +219,7 @@ class DatabaseHandler:
                     UPDATE posts 
                     SET title = ?, desc = ?, image_url = ?,
                         english_summary = ?, ukrainian_title = ?, 
-                        ukrainian_summary = ?, created_at = ?
+                        ukrainian_summary = ?, created_at = ?, status = ?
                     WHERE url = ?
                 ''', (
                     post.title,
@@ -215,6 +229,7 @@ class DatabaseHandler:
                     post.ukrainian_title,
                     post.ukrainian_summary,
                     post.created_at or datetime.now(),
+                    getattr(post, 'status', 'queued'),  # Get status attribute or default to 'queued'
                     post.url
                 ))
                 conn.commit()
@@ -222,4 +237,40 @@ class DatabaseHandler:
                 
         except sqlite3.Error as e:
             print(f"Database error: {e}")
-            return False 
+            return False
+            
+    def update_post_status(self, url: str, status: str) -> bool:
+        """
+        Update the status of a post.
+        
+        Args:
+            url (str): URL of the post to update
+            status (str): New status for the post
+            
+        Returns:
+            bool: True if update was successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE posts 
+                    SET status = ?
+                    WHERE url = ?
+                ''', (status, url))
+                conn.commit()
+                return cursor.rowcount > 0
+                
+        except sqlite3.Error as e:
+            print(f"Database error: {e}")
+            return False
+
+    def close(self):
+        """Close any open database connections."""
+        try:
+            # Since we use context managers for connections,
+            # we don't need to do anything here, but this method
+            # exists for completeness and future use
+            pass
+        except Exception as e:
+            print(f"Error closing database: {e}") 
