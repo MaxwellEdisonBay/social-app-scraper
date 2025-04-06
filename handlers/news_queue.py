@@ -1,26 +1,25 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from common.models.models import Post
 from handlers.db_handler import DatabaseHandler
-from handlers.ml_handler import get_relevant_posts, get_article_translation
+from handlers.ml_handler import filter_similar_posts
 
 class NewsQueue:
-    def __init__(self, max_posts: int = 1000, gemini_api_key: Optional[str] = None):
+    def __init__(self, max_posts: int = 1000):
         """
         Initialize the news queue with database caching.
         
         Args:
             max_posts (int): Maximum number of posts to keep in the queue
-            gemini_api_key (Optional[str]): Gemini API key for ML processing
         """
         self.db_handler = DatabaseHandler(db_path=os.getenv('NEWS_QUEUE_DB_PATH', 'news_queue.db'), max_posts=max_posts)
-        self.gemini_api_key = gemini_api_key
     
     def add_news(self, posts: List[Post], source: str) -> List[Post]:
         """
         Add new posts to the queue and cache them.
+        Checks for semantic similarity with posts from the last day in the backlog.
         
         Args:
             posts (List[Post]): List of posts to add
@@ -32,41 +31,19 @@ class NewsQueue:
         if not posts:
             return []
             
-        # Get existing posts for relevance checking
-        existing_posts = self.db_handler.get_all_posts()
+        # Get posts from the last day in the backlog for similarity checking
+        recent_backlog = self.db_handler.get_recent_posts(days=1, status='processed')
         
-        # Filter for relevance if API key is provided
-        if self.gemini_api_key:
-            relevant_urls = get_relevant_posts(posts, self.gemini_api_key)
-            posts = [post for post in posts if post.url in relevant_urls]
+        # Filter for semantic similarity
+        unique_posts = filter_similar_posts(posts, recent_backlog, threshold=0.85)
         
         # Process and add each post
         added_posts = []
-        for post in posts:
+        for post in unique_posts:
             # Skip if post already exists
             if self.db_handler.get_post_by_url(post.url):
                 continue
                 
-            # Process with ML if API key is provided
-            if self.gemini_api_key:
-                try:
-                    # Get article content
-                    article_content = self._get_article_content(post.url)
-                    if article_content:
-                        # Get translations and improvements
-                        uk_title, en_text, uk_text = get_article_translation(
-                            self.gemini_api_key,
-                            post.title,
-                            article_content
-                        )
-                        
-                        if uk_title and en_text and uk_text:
-                            post.ukrainian_title = uk_title
-                            post.english_summary = en_text
-                            post.ukrainian_summary = uk_text
-                except Exception as e:
-                    print(f"Error processing post with ML: {e}")
-            
             # Set status to queued
             post.status = 'queued'
             

@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from common.models.models import Post
@@ -57,6 +57,7 @@ class DatabaseHandler:
                 # Check if post already exists
                 cursor.execute('SELECT id FROM posts WHERE url = ?', (post.url,))
                 if cursor.fetchone():
+                    print(f"DEBUG: Post already exists in database: {post.url}")
                     return False
                 
                 # Check if we need to remove old posts
@@ -73,40 +74,47 @@ class DatabaseHandler:
                             LIMIT 1
                         )
                     ''')
+                    print(f"DEBUG: Removed oldest post to make room")
                 
                 # Insert new post
-                cursor.execute('''
-                    INSERT INTO posts (
-                        url, title, desc, image_url, 
-                        english_summary, ukrainian_title, ukrainian_summary,
-                        created_at, source, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    post.url,
-                    post.title,
-                    post.desc,
-                    post.image_url,
-                    post.english_summary,
-                    post.ukrainian_title,
-                    post.ukrainian_summary,
-                    post.created_at or datetime.now(),
-                    source,  # Store the source
-                    getattr(post, 'status', 'queued')  # Get status from post or default to 'queued'
-                ))
-                conn.commit()
-                return True
+                try:
+                    cursor.execute('''
+                        INSERT INTO posts (
+                            url, title, desc, image_url, 
+                            english_summary, ukrainian_title, ukrainian_summary,
+                            created_at, source, status
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        post.url,
+                        post.title,
+                        post.desc,
+                        post.image_url,
+                        post.english_summary,
+                        post.ukrainian_title,
+                        post.ukrainian_summary,
+                        post.created_at or datetime.now(),
+                        source,  # Store the source
+                        getattr(post, 'status', 'queued')  # Get status from post or default to 'queued'
+                    ))
+                    conn.commit()
+                    print(f"DEBUG: Successfully added post: {post.url} (status: {getattr(post, 'status', 'queued')})")
+                    return True
+                except sqlite3.Error as e:
+                    print(f"DEBUG: Error inserting post: {e}")
+                    return False
                 
         except sqlite3.Error as e:
-            print(f"Database error: {e}")
+            print(f"DEBUG: Database error: {e}")
             return False
     
-    def get_all_posts(self, source: Optional[str] = None, status: Optional[str] = None) -> List[Post]:
+    def get_all_posts(self, source: Optional[str] = None, status: Optional[str] = None, since: Optional[datetime] = None) -> List[Post]:
         """
-        Get all posts from the database, optionally filtered by source and status.
+        Get all posts from the database, optionally filtered by source, status, and date.
         
         Args:
             source (Optional[str]): Source to filter posts by
             status (Optional[str]): Status to filter posts by ('queued', 'processed', etc.)
+            since (Optional[datetime]): Only return posts created after this datetime
             
         Returns:
             List[Post]: List of Post objects
@@ -130,6 +138,9 @@ class DatabaseHandler:
                 if status:
                     conditions.append("status = ?")
                     params.append(status)
+                if since:
+                    conditions.append("created_at >= ?")
+                    params.append(since.isoformat())
                 
                 if conditions:
                     query += " WHERE " + " AND ".join(conditions)
@@ -193,8 +204,9 @@ class DatabaseHandler:
                         ukrainian_summary=row[6],
                         created_at=datetime.fromisoformat(row[7])
                     )
-                    # Store the status as an attribute
-                    post.status = row[8]
+                    # Store the source and status as attributes
+                    post.source = row[8]
+                    post.status = row[9]
                     return post
                 return None
                 
@@ -273,4 +285,38 @@ class DatabaseHandler:
             # exists for completeness and future use
             pass
         except Exception as e:
-            print(f"Error closing database: {e}") 
+            print(f"Error closing database: {e}")
+
+    def get_recent_posts(self, days: int = 1, source: Optional[str] = None, status: Optional[str] = None) -> List[Post]:
+        """
+        Get posts from the last N days, optionally filtered by source and status.
+        
+        Args:
+            days (int): Number of days to look back
+            source (Optional[str]): Source to filter posts by
+            status (Optional[str]): Status to filter posts by ('queued', 'processed', etc.)
+            
+        Returns:
+            List[Post]: List of Post objects from the last N days
+        """
+        since = datetime.now() - timedelta(days=days)
+        return self.get_all_posts(source=source, status=status, since=since)
+        
+    def wipe_database(self) -> bool:
+        """
+        Clear all entries from the database for testing purposes.
+        This method deletes all records but keeps the table structure intact.
+        
+        Returns:
+            bool: True if the database was successfully wiped, False otherwise
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM posts')
+                conn.commit()
+                print(f"DEBUG: Successfully wiped all entries from database: {self.db_path}")
+                return True
+        except sqlite3.Error as e:
+            print(f"DEBUG: Error wiping database: {e}")
+            return False 
