@@ -60,6 +60,45 @@ def filter_similar_posts(new_posts: list[Post], existing_posts: list[Post], thre
     return filtered_posts
 
 
+def mock_get_relevant_posts(posts: List[Post], api_key: str = None) -> List[str]:
+    """
+    Mock function that imitates Gemini post recommendations for testing purposes.
+    This function selects posts based on simple keyword matching instead of using the Gemini API.
+    
+    Args:
+        posts (List[Post]): List of Post objects containing title and desc.
+        api_key (str, optional): Not used in the mock function, but kept for compatibility.
+        
+    Returns:
+        List[str]: List of post URLs that are considered relevant.
+    """
+    print("\n=== MOCK ML: Filtering posts for relevance ===")
+    
+    # Keywords that indicate relevance for a Ukrainian community website
+    relevant_keywords = [
+        "ukraine", "ukrainian", "russia", "russian", "putin", "zelensky", 
+        "kyiv", "canada", "immigration", "refugee", "visa", "policy",
+        "war", "conflict", "invasion", "military", "aid", "support"
+    ]
+    
+    relevant_urls = []
+    
+    for post in posts:
+        # Combine title and description for keyword matching
+        text = f"{post.title.lower()} {post.desc.lower()}"
+        
+        # Check if any relevant keywords are in the text
+        is_relevant = any(keyword in text for keyword in relevant_keywords)
+        
+        print(f"Analyzing post: {post.title}")
+        if is_relevant:
+            relevant_urls.append(post.url)
+            print(f"-> Post is relevant, keeping it")
+        else:
+            print(f"-> Post is not relevant, filtering it out")
+    
+    print(f"Found {len(relevant_urls)} relevant posts out of {len(posts)} total posts")
+    return relevant_urls
 
 
 def get_relevant_posts(posts: List[Post], api_key: str) -> List[str]:

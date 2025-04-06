@@ -110,6 +110,38 @@ class TestNewsQueueSimilarity(BaseTest):
         # The new post should be added because it's only checked against recent posts
         self.assertEqual(len(added_posts), 1)
         self.assertEqual(added_posts[0].url, new_post.url)
+    
+    def test_pop_queue(self):
+        """Test that pop_queue retrieves all queued posts and marks them as processed"""
+        # Add some test posts to the queue
+        test_posts = create_test_posts()
+        for post in test_posts:
+            post.status = 'queued'
+            self.queue.db_handler.add_post(post, "test")
+        
+        # Verify posts are in the queue
+        queued_posts = self.queue.db_handler.get_all_posts(status='queued')
+        self.assertEqual(len(queued_posts), len(test_posts))
+        
+        # Pop the queue
+        processed_posts = self.queue.pop_queue()
+        
+        # Verify all posts were returned
+        self.assertEqual(len(processed_posts), len(test_posts))
+        
+        # Verify all posts are marked as processed
+        for post in processed_posts:
+            self.assertEqual(post.status, 'processed')
+        
+        # Verify queue is empty
+        queued_posts = self.queue.db_handler.get_all_posts(status='queued')
+        self.assertEqual(len(queued_posts), 0)
+        
+        # Verify posts are in the backlog
+        backlog_posts = self.queue.get_backlog()
+        self.assertEqual(len(backlog_posts), len(test_posts))
+        for post in backlog_posts:
+            self.assertEqual(post.status, 'processed')
 
 def setup_module(module):
     """Set up test environment."""

@@ -9,6 +9,7 @@ import schedule
 from scrapers.test_scraper import TestScraper
 from handlers.news_queue import NewsQueue
 from handlers.db_handler import DatabaseHandler
+from handlers.ml_handler import mock_get_relevant_posts
 
 # Configure logging
 logging.basicConfig(
@@ -50,23 +51,50 @@ def process_news_queue():
     """
     logger.info("Starting news queue processing")
     try:
-        # Get posts to process
-        posts_to_process = news_queue.process_posts()
+        # Get posts to process and mark them as processed
+        processed_posts = news_queue.pop_queue()
         
-        if posts_to_process:
-            logger.info(f"Processing {len(posts_to_process)} posts")
+        if processed_posts:
+            logger.info(f"Retrieved {len(processed_posts)} posts from the queue")
             
-            # Process each post
-            for post in posts_to_process:
-                logger.info(f"Processing post: {post.title}")
-                
-                # Fetch full text for each post
-                full_text = test_scraper.fetch_post_full_text(post.url)
-                logger.info(f"  Full text length: {len(full_text)} characters")
-                
-            # Mark posts as processed
-            news_queue.mark_as_processed(posts_to_process)
-            logger.info(f"Marked {len(posts_to_process)} posts as processed")
+            # Set the source field for each post based on the source from the database
+            for post in processed_posts:
+                # Get the source from the database
+                source = news_queue.db_handler.get_post_source(post.url)
+                if source:
+                    post.source = source
+                    logger.info(f"Set source '{source}' for post: {post.title}")
+                else:
+                    logger.warning(f"Could not find source for post: {post.title}")
+            
+            # Use mock function to filter relevant posts (no API key needed)
+            logger.info("Filtering posts using mock ML function for relevance")
+            relevant_urls = mock_get_relevant_posts(processed_posts)
+            
+            # Log the results
+            logger.info(f"Found {len(relevant_urls)} relevant posts out of {len(processed_posts)} total posts")
+            
+            # Fetch full text for each relevant post using the corresponding scraper
+            for post in processed_posts:
+                if post.url in relevant_urls:
+                    logger.info(f"Fetching full text for relevant post: {post.title}")
+                    
+                    # For test scheduler, we only have the test scraper
+                    try:
+                        full_text = test_scraper.fetch_post_full_text(post.url)
+                        if full_text:
+                            logger.info(f"Successfully fetched full text for {post.title} (length: {len(full_text)} characters)")
+                            # Store the full text in the post object for future use
+                            post.full_text = full_text
+                        else:
+                            logger.warning(f"Failed to fetch full text for {post.title}")
+                    except Exception as e:
+                        logger.error(f"Error fetching full text for {post.title}: {e}")
+            
+            # For now, we're leaving the filtered list unused for future processing
+            # In the future, we would process only the relevant posts
+            
+            logger.info(f"All {len(processed_posts)} posts have been moved to the backlog")
         else:
             logger.info("No posts to process in the queue")
             

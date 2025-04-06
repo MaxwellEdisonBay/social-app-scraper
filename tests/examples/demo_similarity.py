@@ -85,6 +85,23 @@ def demonstrate_similarity_filtering():
         else:
             print(f"  - Result: Filtered out (unexpected)")
         
+        # Demonstrate pop_queue functionality
+        print("\n6. Demonstrating pop_queue functionality:")
+        print("  - Current queue status:")
+        queued_posts = queue.db_handler.get_all_posts(status='queued')
+        print(f"    * Queue contains {len(queued_posts)} posts")
+        
+        # Pop the queue
+        processed_posts = queue.pop_queue()
+        print(f"  - Popped {len(processed_posts)} posts from the queue")
+        print("  - All posts are now marked as processed")
+        
+        # Check the queue and backlog
+        queued_posts = queue.db_handler.get_all_posts(status='queued')
+        backlog_posts = queue.get_backlog()
+        print(f"  - Queue now contains {len(queued_posts)} posts (should be 0)")
+        print(f"  - Backlog now contains {len(backlog_posts)} posts")
+        
         print("\n=== DEMONSTRATION COMPLETE ===")
         
     finally:

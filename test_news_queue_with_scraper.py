@@ -48,9 +48,9 @@ def test_news_queue_with_scraper():
         
         # Step 4: Process posts
         print("\n=== STEP 4: Processing posts ===")
-        posts_to_process = news_queue.process_posts()
-        print(f"Retrieved {len(posts_to_process)} posts for processing:")
-        for post in posts_to_process:
+        processed_posts = news_queue.pop_queue()
+        print(f"Retrieved and processed {len(processed_posts)} posts:")
+        for post in processed_posts:
             print(f"- {post.title} (Status: {post.status})")
             
             # Fetch full text for each post
@@ -62,26 +62,22 @@ def test_news_queue_with_scraper():
         queued_posts = news_queue.db_handler.get_all_posts(status='queued')
         print(f"Queue contains {len(queued_posts)} posts (should be 0)")
         
-        # Step 6: Mark posts as processed
-        print("\n=== STEP 6: Marking posts as processed ===")
-        news_queue.mark_as_processed(posts_to_process)
-        
-        # Step 7: Check the backlog
-        print("\n=== STEP 7: Checking the backlog ===")
+        # Step 6: Check the backlog
+        print("\n=== STEP 6: Checking the backlog ===")
         backlog = news_queue.get_backlog()
         print(f"Backlog contains {len(backlog)} posts:")
         for post in backlog:
             print(f"- {post.title} (Status: {post.status})")
         
-        # Step 8: Final check of the queue
-        print("\n=== STEP 8: Final check of the queue ===")
+        # Step 7: Final check of the queue
+        print("\n=== STEP 7: Final check of the queue ===")
         queued_posts = news_queue.db_handler.get_all_posts(status='queued')
         print(f"Queue contains {len(queued_posts)} posts (should be 0)")
         
         print("\n=== TEST SUMMARY ===")
         print("1. Scraper fetched news posts")
         print("2. Posts were added to the queue")
-        print("3. Posts were retrieved from the queue for processing")
+        print("3. Posts were retrieved from the queue and processed")
         print("4. Queue was emptied after processing")
         print("5. Posts were moved to the backlog")
         print("6. Queue remained empty")

@@ -33,7 +33,8 @@ class DatabaseHandler:
                     ukrainian_summary TEXT,
                     created_at TIMESTAMP NOT NULL,
                     source TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'queued'
+                    status TEXT NOT NULL DEFAULT 'queued',
+                    full_text TEXT
                 )
             ''')
             conn.commit()
@@ -82,8 +83,8 @@ class DatabaseHandler:
                         INSERT INTO posts (
                             url, title, desc, image_url, 
                             english_summary, ukrainian_title, ukrainian_summary,
-                            created_at, source, status
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            created_at, source, status, full_text
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (
                         post.url,
                         post.title,
@@ -94,7 +95,8 @@ class DatabaseHandler:
                         post.ukrainian_summary,
                         post.created_at or datetime.now(),
                         source,  # Store the source
-                        getattr(post, 'status', 'queued')  # Get status from post or default to 'queued'
+                        getattr(post, 'status', 'queued'),  # Get status from post or default to 'queued'
+                        getattr(post, 'full_text', None)  # Store the full text
                     ))
                     conn.commit()
                     print(f"DEBUG: Successfully added post: {post.url} (status: {getattr(post, 'status', 'queued')})")
@@ -126,7 +128,7 @@ class DatabaseHandler:
                 query = '''
                     SELECT url, title, desc, image_url, 
                            english_summary, ukrainian_title, ukrainian_summary,
-                           created_at, source, status
+                           created_at, source, status, full_text
                     FROM posts 
                 '''
                 params = []
@@ -161,9 +163,10 @@ class DatabaseHandler:
                         ukrainian_summary=row[6],
                         created_at=datetime.fromisoformat(row[7])
                     )
-                    # Set source and status
+                    # Set source, status, and full text
                     post.source = row[8]
                     post.status = row[9]
+                    post.full_text = row[10]
                     posts.append(post)
                 return posts
                 
@@ -231,7 +234,8 @@ class DatabaseHandler:
                     UPDATE posts 
                     SET title = ?, desc = ?, image_url = ?,
                         english_summary = ?, ukrainian_title = ?, 
-                        ukrainian_summary = ?, created_at = ?, status = ?
+                        ukrainian_summary = ?, created_at = ?, status = ?,
+                        full_text = ?
                     WHERE url = ?
                 ''', (
                     post.title,
@@ -242,6 +246,7 @@ class DatabaseHandler:
                     post.ukrainian_summary,
                     post.created_at or datetime.now(),
                     getattr(post, 'status', 'queued'),  # Get status attribute or default to 'queued'
+                    getattr(post, 'full_text', ''),  # Get full text attribute or default to empty string
                     post.url
                 ))
                 conn.commit()
@@ -301,6 +306,30 @@ class DatabaseHandler:
         """
         since = datetime.now() - timedelta(days=days)
         return self.get_all_posts(source=source, status=status, since=since)
+        
+    def get_post_source(self, url: str) -> Optional[str]:
+        """
+        Get the source of a post by its URL.
+        
+        Args:
+            url (str): URL of the post
+            
+        Returns:
+            Optional[str]: Source of the post if found, None otherwise
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT source FROM posts WHERE url = ?', (url,))
+                result = cursor.fetchone()
+                
+                if result:
+                    return result[0]
+                return None
+                
+        except sqlite3.Error as e:
+            print(f"Database error: {e}")
+            return None
         
     def wipe_database(self) -> bool:
         """

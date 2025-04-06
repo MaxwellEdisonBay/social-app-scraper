@@ -7,14 +7,16 @@ from handlers.db_handler import DatabaseHandler
 from handlers.ml_handler import filter_similar_posts
 
 class NewsQueue:
-    def __init__(self, max_posts: int = 1000):
+    def __init__(self, max_posts: int = 1000, db_path: Optional[str] = None):
         """
         Initialize the news queue with database caching.
         
         Args:
             max_posts (int): Maximum number of posts to keep in the queue
+            db_path (Optional[str]): Path to the database file. If None, uses the default path.
         """
-        self.db_handler = DatabaseHandler(db_path=os.getenv('NEWS_QUEUE_DB_PATH', 'news_queue.db'), max_posts=max_posts)
+        db_path = db_path or os.getenv('NEWS_QUEUE_DB_PATH', 'news_queue.db')
+        self.db_handler = DatabaseHandler(db_path=db_path, max_posts=max_posts)
     
     def add_news(self, posts: List[Post], source: str) -> List[Post]:
         """
@@ -53,24 +55,25 @@ class NewsQueue:
         
         return added_posts
     
-    def process_posts(self) -> List[Post]:
+    def pop_queue(self) -> List[Post]:
         """
-        Retrieve all posts currently in the queue for processing.
-        This is a placeholder method that will be implemented later.
+        Retrieve all posts currently in the queue and mark them as processed.
+        This function combines the functionality of process_posts and mark_as_processed.
         
         Returns:
-            List[Post]: List of posts to be processed
+            List[Post]: List of posts that were in the queue and are now marked as processed
         """
         # Get all queued posts
         queued_posts = self.db_handler.get_all_posts(status='queued')
         
-        # Mark posts as being processed
+        # Mark posts as processed
         for post in queued_posts:
-            self.db_handler.update_post_status(post.url, 'processing')
+            post.status = 'processed'
+            self.db_handler.update_post(post)
         
         return queued_posts
     
-    def mark_as_processed(self, posts: List[Post]) -> bool:
+    def _mark_as_processed(self, posts: List[Post]) -> bool:
         """
         Mark posts as processed and move them to the backlog.
         
@@ -166,31 +169,24 @@ if __name__ == "__main__":
             print(f"- {post.title} (Status: {post.status})")
         
         print("\n=== STEP 3: Processing posts ===")
-        posts_to_process = queue.process_posts()
-        print(f"Retrieved {len(posts_to_process)} posts for processing:")
-        for post in posts_to_process:
-            print(f"- {post.title} (Status: {post.status})")
+        # Use pop_queue instead of process_posts
+        # The result is left unused for now to allow for future processing logic
+        queue.pop_queue()
+        print("Posts have been processed and moved to the backlog")
         
         print("\n=== STEP 4: Checking the queue after processing ===")
         queued_posts = queue.db_handler.get_all_posts(status='queued')
         print(f"Queue contains {len(queued_posts)} posts (should be 0)")
         
-        print("\n=== STEP 5: Marking posts as processed ===")
-        queue.mark_as_processed(posts_to_process)
-        
-        print("\n=== STEP 6: Checking the backlog ===")
+        print("\n=== STEP 5: Checking the backlog ===")
         backlog = queue.get_backlog()
         print(f"Backlog contains {len(backlog)} posts:")
         for post in backlog:
             print(f"- {post.title} (Status: {post.status})")
         
-        print("\n=== STEP 7: Final check of the queue ===")
-        queued_posts = queue.db_handler.get_all_posts(status='queued')
-        print(f"Queue contains {len(queued_posts)} posts (should be 0)")
-        
         print("\n=== TEST SUMMARY ===")
         print("1. Posts were added to the queue")
-        print("2. Posts were retrieved from the queue for processing")
+        print("2. Posts were retrieved from the queue and marked as processed")
         print("3. Queue was emptied after processing")
         print("4. Posts were moved to the backlog")
         print("5. Queue remained empty")
