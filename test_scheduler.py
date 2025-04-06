@@ -2,7 +2,9 @@
 import os
 import time
 import logging
+import asyncio
 from datetime import datetime
+from dotenv import load_dotenv
 
 import schedule
 
@@ -10,6 +12,10 @@ from scrapers.test_scraper import TestScraper
 from handlers.news_queue import NewsQueue
 from handlers.db_handler import DatabaseHandler
 from handlers.ml_handler import mock_get_relevant_posts
+from handlers.telegram_handler import TelegramHandler
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -26,6 +32,12 @@ logger = logging.getLogger("test_scheduler")
 db_handler = DatabaseHandler(max_posts=100)
 news_queue = NewsQueue(max_posts=100)
 test_scraper = TestScraper(db_handler=db_handler)
+
+# Initialize Telegram handler
+bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+logger.info(f"Bot token loaded: {'Yes' if bot_token else 'No'}")
+telegram_handler = TelegramHandler()
+logger.info(f"Bot enabled: {'Yes' if telegram_handler.enabled else 'No'}")
 
 def scrape_test_news():
     """
@@ -45,7 +57,7 @@ def scrape_test_news():
     except Exception as e:
         logger.error(f"Error scraping test scraper: {e}")
 
-def process_news_queue():
+async def process_news_queue():
     """
     Process posts in the news queue.
     """
@@ -74,22 +86,38 @@ def process_news_queue():
             # Log the results
             logger.info(f"Found {len(relevant_urls)} relevant posts out of {len(processed_posts)} total posts")
             
-            # Fetch full text for each relevant post using the corresponding scraper
+            # Process each post
             for post in processed_posts:
-                if post.url in relevant_urls:
-                    logger.info(f"Fetching full text for relevant post: {post.title}")
+                try:
+                    # Get the full text for the post
+                    logger.info(f"Fetching full text for post: {post.title}")
+                    full_text = test_scraper.fetch_post_full_text(post.url)
                     
-                    # For test scheduler, we only have the test scraper
-                    try:
-                        full_text = test_scraper.fetch_post_full_text(post.url)
-                        if full_text:
-                            logger.info(f"Successfully fetched full text for {post.title} (length: {len(full_text)} characters)")
-                            # Store the full text in the post object for future use
-                            post.full_text = full_text
+                    if full_text:
+                        logger.info(f"Successfully fetched full text for {post.title} (length: {len(full_text)})")
+                        post.full_text = full_text
+                        
+                        # Create mock translations for testing
+                        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                        post.ukrainian_title = f"Тестовий пост з перекладами - {timestamp}"
+                        post.english_summary = f"This is an improved English summary of the test post. It contains the main points of the article in a more readable format. This is test {timestamp}."
+                        post.ukrainian_summary = f"Це покращений український переклад тестового поста. Він містить основні моменти статті в більш читабельному форматі. Це тест {timestamp}."
+                        
+                        # Update the post in the database
+                        news_queue.db_handler.update_post(post)
+                        logger.info(f"Updated post in database with translations: {post.title}")
+                        
+                        # Send the post to Telegram subscribers
+                        if telegram_handler.enabled:
+                            logger.info(f"Sending post to Telegram subscribers: {post.title}")
+                            sent_count = await telegram_handler.broadcast_post(post, source=post.source)
+                            logger.info(f"Sent post to {sent_count} Telegram subscribers")
                         else:
-                            logger.warning(f"Failed to fetch full text for {post.title}")
-                    except Exception as e:
-                        logger.error(f"Error fetching full text for {post.title}: {e}")
+                            logger.warning("Telegram bot is not enabled. Please check your TELEGRAM_BOT_TOKEN.")
+                    else:
+                        logger.warning(f"Failed to fetch full text for {post.title}")
+                except Exception as e:
+                    logger.error(f"Error fetching full text for {post.title}: {e}")
             
             # For now, we're leaving the filtered list unused for future processing
             # In the future, we would process only the relevant posts
@@ -101,47 +129,40 @@ def process_news_queue():
     except Exception as e:
         logger.error(f"Error processing news queue: {e}")
 
-def run_test_scheduler():
+def setup_schedules():
     """
-    Run the test scheduler with short intervals.
+    Set up all scheduled jobs.
+    """
+    # Schedule test scraper to run every 5 minutes
+    schedule.every(5).minutes.do(scrape_test_news)
+    
+    # Schedule news queue processing to run every 5 minutes
+    schedule.every(5).minutes.do(lambda: asyncio.run(process_news_queue()))
+
+def run_scheduler():
+    """
+    Run the scheduler loop.
     """
     logger.info("Starting test scheduler")
-    
-    # Schedule jobs with short intervals for testing
-    schedule.every(5).seconds.do(scrape_test_news)
-    schedule.every(10).seconds.do(process_news_queue)
     
     # Run immediately on startup
     logger.info("Running initial scrape")
     scrape_test_news()
     
     logger.info("Running initial news queue processing")
-    process_news_queue()
+    asyncio.run(process_news_queue())
     
-    # Main loop - run for 30 seconds then exit
+    # Set up schedules
+    setup_schedules()
+    
+    # Run for 30 seconds
     logger.info("Entering scheduler loop (will run for 30 seconds)")
     start_time = time.time()
-    
-    while time.time() - start_time < 30:  # 30 seconds
-        try:
-            schedule.run_pending()
-            time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Scheduler stopped by user")
-            break
-        except Exception as e:
-            logger.error(f"Error in scheduler loop: {e}")
-            time.sleep(5)
+    while time.time() - start_time < 30:
+        schedule.run_pending()
+        time.sleep(1)
     
     logger.info("Test scheduler completed")
 
 if __name__ == "__main__":
-    # Clear the database before testing
-    try:
-        if os.path.exists('news_queue.db'):
-            os.remove('news_queue.db')
-            logger.info("Cleared existing database")
-    except Exception as e:
-        logger.warning(f"Could not clear database: {e}")
-    
-    run_test_scheduler() 
+    run_scheduler() 

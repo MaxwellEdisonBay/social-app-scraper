@@ -1,16 +1,23 @@
 # schedule_script.py
+import logging
 import os
 import time
-import logging
 from datetime import datetime
 from typing import Dict, List, Optional
+import asyncio
 
 import schedule
+from dotenv import load_dotenv
 
-from scrapers.bbc_scraper import BBCScraper
-from handlers.news_queue import NewsQueue
 from handlers.db_handler import DatabaseHandler
-from handlers.ml_handler import get_article_translation, get_relevant_posts, mock_get_relevant_posts
+from handlers.ml_handler import (get_article_translation, get_relevant_posts,
+                                 mock_get_relevant_posts)
+from handlers.news_queue import NewsQueue
+from handlers.telegram_handler import TelegramHandler
+from scrapers.bbc_scraper import BBCScraper
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -26,10 +33,11 @@ logger = logging.getLogger("scheduler")
 # Initialize shared components
 db_handler = DatabaseHandler(max_posts=100)
 news_queue = NewsQueue(max_posts=100)
+telegram_handler = TelegramHandler()
 
 # Initialize scrapers
 scrapers = {
-    "bbc": BBCScraper(db_handler=db_handler)
+    "bbc": BBCScraper(enable_caching=True, max_posts=100)
 }
 
 # Configuration for scheduling
@@ -58,7 +66,7 @@ def scrape_news(source: str) -> None:
     logger.info(f"Starting scrape for {source}")
     try:
         scraper = scrapers[source]
-        posts = scraper.fetch_news_updates()
+        posts = scraper.fetch_post_updates()
         
         if posts:
             logger.info(f"Fetched {len(posts)} posts from {source}")
@@ -70,104 +78,81 @@ def scrape_news(source: str) -> None:
     except Exception as e:
         logger.error(f"Error scraping {source}: {e}")
 
-def process_news_queue() -> None:
-    """
-    Process posts in the news queue.
-    """
-    logger.info("Starting news queue processing")
+async def process_news_queue():
+    """Process the news queue and broadcast relevant posts."""
     try:
-        # Get posts to process and mark them as processed
+        # Get posts from the queue
         processed_posts = news_queue.pop_queue()
         
         if processed_posts:
-            logger.info(f"Retrieved {len(processed_posts)} posts from the queue")
+            logger.info(f"Processing {len(processed_posts)} posts from the queue")
             
-            # Set the source field for each post based on the source from the database
-            for post in processed_posts:
-                # Get the source from the database
-                source = news_queue.db_handler.get_post_source(post.url)
-                if source:
-                    post.source = source
-                    logger.info(f"Set source '{source}' for post: {post.title}")
-                else:
-                    logger.warning(f"Could not find source for post: {post.title}")
+            # Get API key for ML processing
+            api_key = os.getenv("GOOGLE_API_KEY")
+            if not api_key:
+                logger.error("GOOGLE_API_KEY environment variable not set")
+                return
             
-            # Check if we're in test mode
-            use_mock = os.getenv("USE_MOCK_ML", "false").lower() == "true"
-            
-            if use_mock:
-                # Use mock function to filter relevant posts (no API key needed)
-                logger.info("Using mock ML function for relevance filtering (test mode)")
+            # Get relevant posts using ML
+            logger.info("Filtering posts for relevance")
+            if os.getenv("USE_MOCK_ML") == "true":
+                # Use mock function for testing
                 relevant_urls = mock_get_relevant_posts(processed_posts)
             else:
-                # Use Gemini to filter relevant posts
-                api_key = os.getenv("GEMINI_API_KEY")
-                if not api_key:
-                    logger.error("GEMINI_API_KEY environment variable not set")
-                    return
-                    
-                logger.info("Filtering posts using Gemini for relevance")
+                # Use actual ML function
                 relevant_urls = get_relevant_posts(processed_posts, api_key)
             
-            # Log the results
-            logger.info(f"Found {len(relevant_urls)} relevant posts out of {len(processed_posts)} total posts")
+            logger.info(f"Found {len(relevant_urls)} relevant posts")
             
-            # Fetch full text for each relevant post using the corresponding scraper
+            # Process each relevant post
             for post in processed_posts:
-                if post.url in relevant_urls:
-                    logger.info(f"Fetching full text for relevant post: {post.title}")
-                    
+                if post.url not in relevant_urls:
+                    logger.info(f"Post not relevant, skipping: {post.title}")
+                    continue
+                
+                try:
                     # Get the corresponding scraper based on the post's source
                     if post.source in scrapers:
                         scraper = scrapers[post.source]
-                        try:
-                            full_text = scraper.fetch_post_full_text(post.url)
-                            if full_text:
-                                logger.info(f"Successfully fetched full text for {post.title} (length: {len(full_text)} characters)")
-                                # Store the full text in the post object for future use
-                                post.full_text = full_text
-                                
-                                # Get translations if we have a Gemini API key
-                                if not use_mock and api_key:
-                                    logger.info(f"Getting translations for post: {post.title}")
-                                    try:
-                                        uk_title, en_text, uk_text = get_article_translation(
-                                            api_key=api_key,
-                                            title=post.title,
-                                            text=full_text
-                                        )
-                                        
-                                        if uk_title and en_text and uk_text:
-                                            logger.info(f"Successfully translated post: {post.title}")
-                                            # Update the post with translations
-                                            post.ukrainian_title = uk_title
-                                            post.english_summary = en_text
-                                            post.ukrainian_summary = uk_text
-                                            # Update the post in the database
-                                            news_queue.db_handler.update_post(post)
-                                            logger.info(f"Updated post in database with translations: {post.title}")
-                                        else:
-                                            logger.warning(f"Failed to get translations for post: {post.title}")
-                                    except Exception as e:
-                                        logger.error(f"Error getting translations for {post.title}: {e}")
-                                else:
-                                    logger.info(f"Skipping translations for post: {post.title} (test mode or no API key)")
-                            else:
-                                logger.warning(f"Failed to fetch full text for {post.title}")
-                        except Exception as e:
-                            logger.error(f"Error fetching full text for {post.title}: {e}")
+                        
+                        # Fetch full text if not already present
+                        if not post.full_text:
+                            logger.info(f"Fetching full text for: {post.title}")
+                            post.full_text = scraper.fetch_post_full_text(post.url)
+                            news_queue.db_handler.update_post(post)
+                        
+                        # Get translations
+                        logger.info(f"Getting translations for: {post.title}")
+                        uk_title, en_text, uk_text = get_article_translation(
+                            api_key, post.title, post.full_text
+                        )
+                        
+                        if uk_title and en_text and uk_text:
+                            post.uk_title = uk_title
+                            post.en_text = en_text
+                            post.uk_text = uk_text
+                            news_queue.db_handler.update_post(post)
+                            
+                            # Send to Telegram subscribers
+                            logger.info(f"Sending post to Telegram subscribers: {post.title}")
+                            sent_count = await telegram_handler.broadcast_post(post, source=post.source)
+                            logger.info(f"Broadcasted post to {sent_count} subscribers")
+                        else:
+                            logger.error(f"Failed to get translations for: {post.title}")
                     else:
-                        logger.warning(f"No scraper found for source '{post.source}', skipping full text fetch for {post.title}")
+                        logger.warning(f"No scraper found for source '{post.source}', skipping: {post.title}")
+                    
+                except Exception as e:
+                    logger.error(f"Error processing post {post.title}: {e}")
+                    continue
             
-            # For now, we're leaving the filtered list unused for future processing
-            # In the future, we would process only the relevant posts
-            
-            logger.info(f"All {len(processed_posts)} posts have been moved to the backlog")
+            # All posts have been processed and moved to backlog
+            logger.info(f"All {len(processed_posts)} posts have been processed")
         else:
             logger.info("No posts to process in the queue")
             
     except Exception as e:
-        logger.error(f"Error processing news queue: {e}")
+        logger.error(f"Error in process_news_queue: {e}")
 
 def setup_schedules() -> None:
     """
@@ -176,18 +161,12 @@ def setup_schedules() -> None:
     # Set up scraper jobs
     for source, config in SCHEDULE_CONFIG.items():
         if source == "news_queue":
-            continue  # Skip news queue here, handle it separately
+            continue  # Skip news queue here, it's handled in run_scheduler
             
         if config["enabled"]:
             interval = config["interval"]
             logger.info(f"Scheduling {source} scraper to run every {interval} minutes")
             schedule.every(interval).minutes.do(scrape_news, source=source)
-    
-    # Set up news queue processing job
-    if SCHEDULE_CONFIG["news_queue"]["enabled"]:
-        interval = SCHEDULE_CONFIG["news_queue"]["interval"]
-        logger.info(f"Scheduling news queue processing to run every {interval} minutes")
-        schedule.every(interval).minutes.do(process_news_queue)
 
 def run_scheduler() -> None:
     """
@@ -196,6 +175,16 @@ def run_scheduler() -> None:
     logger.info("Starting scheduler")
     setup_schedules()
     
+    # Create a wrapper function for the async process_news_queue
+    def run_process_news_queue():
+        asyncio.run(process_news_queue())
+    
+    # Update the scheduler to use the wrapper function
+    if SCHEDULE_CONFIG["news_queue"]["enabled"]:
+        interval = SCHEDULE_CONFIG["news_queue"]["interval"]
+        logger.info(f"Scheduling news queue processing to run every {interval} minutes")
+        schedule.every(interval).minutes.do(run_process_news_queue)
+    
     # Run immediately on startup
     logger.info("Running initial scrape for all sources")
     for source in scrapers.keys():
@@ -203,7 +192,7 @@ def run_scheduler() -> None:
             scrape_news(source)
     
     logger.info("Running initial news queue processing")
-    process_news_queue()
+    run_process_news_queue()
     
     # Main loop
     logger.info("Entering scheduler loop")

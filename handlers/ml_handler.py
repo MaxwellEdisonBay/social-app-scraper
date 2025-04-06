@@ -13,7 +13,7 @@ if project_root not in sys.path:
 from common.models.models import Post
 import json
 
-def filter_similar_posts(new_posts: list[Post], existing_posts: list[Post], threshold: float = 0.85) -> list[Post]:
+def filter_similar_posts(new_posts: list[Post], existing_posts: list[Post], threshold: float = 0.95) -> list[Post]:
     """
     Filter out posts that are too similar to existing posts.
     
@@ -21,7 +21,7 @@ def filter_similar_posts(new_posts: list[Post], existing_posts: list[Post], thre
         new_posts (list[Post]): List of new posts to check
         existing_posts (list[Post]): List of existing posts to compare against
         threshold (float): Similarity threshold (0.0 to 1.0). Higher means more strict.
-                         Default is 0.85 (85% similarity)
+                         Default is 0.95 (95% similarity)
     
     Returns:
         list[Post]: List of posts that are sufficiently different from existing posts
@@ -78,24 +78,21 @@ def mock_get_relevant_posts(posts: List[Post], api_key: str = None) -> List[str]
     relevant_keywords = [
         "ukraine", "ukrainian", "russia", "russian", "putin", "zelensky", 
         "kyiv", "canada", "immigration", "refugee", "visa", "policy",
-        "war", "conflict", "invasion", "military", "aid", "support"
+        "war", "conflict", "invasion", "military", "aid", "support",
+        # Add more general keywords for testing
+        "news", "update", "report", "announcement", "development",
+        "politics", "technology", "sports", "entertainment", "science", "business",
+        "community", "local", "global", "international", "national",
+        "breaking", "latest", "important", "critical", "urgent"
     ]
     
     relevant_urls = []
     
     for post in posts:
-        # Combine title and description for keyword matching
-        text = f"{post.title.lower()} {post.desc.lower()}"
-        
-        # Check if any relevant keywords are in the text
-        is_relevant = any(keyword in text for keyword in relevant_keywords)
-        
+        # For testing purposes, mark all posts as relevant
+        relevant_urls.append(post.url)
         print(f"Analyzing post: {post.title}")
-        if is_relevant:
-            relevant_urls.append(post.url)
-            print(f"-> Post is relevant, keeping it")
-        else:
-            print(f"-> Post is not relevant, filtering it out")
+        print(f"-> Post is relevant, keeping it")
     
     print(f"Found {len(relevant_urls)} relevant posts out of {len(posts)} total posts")
     return relevant_urls
@@ -113,40 +110,48 @@ def get_relevant_posts(posts: List[Post], api_key: str) -> List[str]:
     Returns:
         List[str]: List of post URLs that are the most relevant for news display.
     """
-    client = genai.Client(api_key=api_key)
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-2.0-flash')
 
-    prompt = (
-        "You are a news analyst for a Ukrainian community website in Canada. "
-        "Analyze the following news post and determine if it's relevant for our community. "
-        "If it's relevant, return a JSON array containing the post's URL. "
-        "If it's not relevant, return an empty JSON array []. "
-        "Consider these criteria:\n"
-        "1. High priority: News about Ukraine or policies for Ukrainians in Canada\n"
-        "2. Medium priority: Important Canadian or US news that affects the community\n"
-        "3. Low priority: General news that might be less relevant\n\n"
-        "IMPORTANT: Return ONLY a JSON array, with no additional text, no markdown formatting, and no explanations. "
-        "For example, for a relevant post, return: [\"https://example.com/url\"]\n"
-        "For an irrelevant post, return: []\n\n"
-        "Title: {title}\n"
-        "Description: {desc}\n"
-        "URL: {url}"
-    )
-
+    # Process posts in batches of 10 to respect rate limits
+    batch_size = 10
     relevant_urls = []
-    for post in posts:
+    
+    for i in range(0, len(posts), batch_size):
+        batch = posts[i:i+batch_size]
+        print(f"\nProcessing batch {i//batch_size + 1} of {(len(posts) + batch_size - 1)//batch_size}")
+        
+        # Create a prompt that handles multiple posts in one API call
+        batch_prompt = (
+            "You are a news analyst for a Ukrainian community website in Canada. "
+            "Analyze the following news posts and determine which ones are relevant for our community. "
+            "Return a JSON array containing ONLY the URLs of the MOST relevant posts (maximum 10). "
+            "If there are some posts that are similar, return only one of them. "
+            "If there are some posts that are relevant for Canadians in general, you should return them as well. "
+            "If none are relevant, return an empty JSON array []. "
+            "Consider these criteria:\n"
+            "1. High priority: News about Ukraine or policies for Ukrainians in Canada\n"
+            "2. Medium priority: Important Canadian or US news that affects the community\n"
+            "3. Low priority: General news that might be less relevant\n\n"
+            "IMPORTANT: Return ONLY a JSON array, with no additional text, no markdown formatting, and no explanations. "
+            "For example, for relevant posts, return: [\"https://example.com/url1\", \"https://example.com/url2\"]\n"
+            "For irrelevant posts, return: []\n\n"
+            "Posts to analyze:\n"
+        )
+        
+        # Add each post to the batch prompt
+        for j, post in enumerate(batch):
+            batch_prompt += f"\nPost {j+1}:\nTitle: {post.title}\nDescription: {post.desc}\nURL: {post.url}\n"
+        
         try:
-            formatted_prompt = prompt.format(
-                title=post.title,
-                desc=post.desc,
-                url=post.url
-            )
+            # Add a small delay between batches to respect rate limits
+            if i > 0:
+                import time
+                time.sleep(5)  # 5 second delay between batches
+                
+            response = model.generate_content(batch_prompt)
             
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=formatted_prompt
-            )
-            
-            print(f"\nAnalyzing post: {post.title}")
+            print(f"Processing {len(batch)} posts in batch")
             print(f"Raw response: {response.text}")
             
             # Try to extract URLs from the response
@@ -162,20 +167,43 @@ def get_relevant_posts(posts: List[Post], api_key: str) -> List[str]:
                 urls = json.loads(clean_text)
                 if isinstance(urls, list):
                     relevant_urls.extend(urls)
-                    print(f"Found URLs: {urls}")
+                    print(f"Found URLs in batch: {urls}")
                 else:
                     print(f"Unexpected response format: {response.text}")
             except json.JSONDecodeError as e:
                 print(f"Error decoding JSON: {e}")
-                # If the response contains the URL directly, try to extract it
-                if post.url in response.text:
-                    relevant_urls.append(post.url)
-                    print(f"Found URL in text: {post.url}")
+                # If the response contains URLs directly, try to extract them
+                for post in batch:
+                    if post.url in response.text:
+                        relevant_urls.append(post.url)
+                        print(f"Found URL in text: {post.url}")
                 else:
                     print("No valid URLs found in response")
                     
         except Exception as e:
-            print(f"Error processing post '{post.title}': {e}")
+            print(f"Error processing batch: {e}")
+            # If we hit a rate limit, wait longer before continuing
+            if "429" in str(e) or "quota" in str(e).lower():
+                print("Rate limit detected. Waiting 60 seconds before continuing...")
+                import time
+                time.sleep(60)
+                # Try to process this batch again
+                try:
+                    response = model.generate_content(batch_prompt)
+                    # Process response as above
+                    clean_text = response.text.strip()
+                    if clean_text.startswith('```json'):
+                        clean_text = clean_text[7:]
+                    if clean_text.endswith('```'):
+                        clean_text = clean_text[:-3]
+                    clean_text = clean_text.strip()
+                    
+                    urls = json.loads(clean_text)
+                    if isinstance(urls, list):
+                        relevant_urls.extend(urls)
+                        print(f"Found URLs in retry batch: {urls}")
+                except Exception as retry_e:
+                    print(f"Error on retry: {retry_e}")
             continue
 
     return list(set(relevant_urls))  # Remove duplicates
@@ -211,33 +239,69 @@ Original text:
 """
 
     try:
-       
-        client= genai.Client(api_key=api_key)
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.0-flash')
         
         formatted_prompt = prompt.format(
             title=title,
             text=text
         )
         
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=formatted_prompt
-        )
+        response = model.generate_content(formatted_prompt)
         
         # Clean the response text
         clean_text = response.text.strip()
+        
+        # Remove markdown code block markers if present
         if clean_text.startswith('```json'):
             clean_text = clean_text[7:]
         if clean_text.endswith('```'):
             clean_text = clean_text[:-3]
         clean_text = clean_text.strip()
         
-        result = json.loads(clean_text)
-        return (
-            result['uk_title'],
-            result['en_text'], 
-            result['uk_text']
-        )
+        # Fix common JSON issues
+        # Replace escaped newlines with actual newlines
+        clean_text = clean_text.replace('\\n', '\n')
+        # Replace escaped quotes with actual quotes
+        clean_text = clean_text.replace('\\"', '"')
+        # Replace escaped backslashes with actual backslashes
+        clean_text = clean_text.replace('\\\\', '\\')
+        
+        # Try to parse the JSON
+        try:
+            result = json.loads(clean_text)
+        except json.JSONDecodeError as e:
+            print(f"Error parsing JSON: {e}")
+            print(f"Cleaned text: {clean_text}")
+            
+            # Try to extract the fields using regex as a fallback
+            import re
+            
+            uk_title_match = re.search(r'"uk_title"\s*:\s*"([^"]*)"', clean_text)
+            en_text_match = re.search(r'"en_text"\s*:\s*"([^"]*)"', clean_text)
+            uk_text_match = re.search(r'"uk_text"\s*:\s*"([^"]*)"', clean_text)
+            
+            if uk_title_match and en_text_match and uk_text_match:
+                return (
+                    uk_title_match.group(1),
+                    en_text_match.group(1),
+                    uk_text_match.group(1)
+                )
+            else:
+                # If we can't extract the fields, return None
+                print("Could not extract fields using regex")
+                return None, None, None
+        
+        # Check if all required fields are present
+        if 'uk_title' in result and 'en_text' in result and 'uk_text' in result:
+            return (
+                result['uk_title'],
+                result['en_text'], 
+                result['uk_text']
+            )
+        else:
+            print(f"Missing required fields in JSON: {result}")
+            return None, None, None
         
     except Exception as e:
         print(f"Error translating article: {e}")
