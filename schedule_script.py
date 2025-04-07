@@ -16,6 +16,7 @@ from handlers.news_queue import NewsQueue
 from handlers.telegram_handler import TelegramHandler
 from scrapers.bbc_scraper import BBCScraper
 from scrapers.toronto_star_scraper import TorontoStarScraper
+from scrapers.ircc_scraper import IRCCScraper
 
 # Load environment variables from .env file
 load_dotenv()
@@ -39,21 +40,26 @@ telegram_handler = TelegramHandler()
 # Initialize scrapers
 scrapers = {
     "bbc": BBCScraper(enable_caching=True, max_posts=100),
-    "toronto_star": TorontoStarScraper(enable_caching=True, max_posts=100)
+    "toronto_star": TorontoStarScraper(enable_caching=True, max_posts=100),
+    "ircc": IRCCScraper(enable_caching=True, max_posts=100, cooldown=2.0)
 }
 
 # Configuration for scheduling
 SCHEDULE_CONFIG = {
     "bbc": {
-        "interval": 1,  # minutes
+        "interval": 30,  # minutes
         "enabled": True
     },
     "toronto_star": {
-        "interval": 1,  # minutes
+        "interval": 30,  # minutes
+        "enabled": True
+    },
+    "ircc": {
+        "interval": 60,  # minutes - longer interval due to cooldown
         "enabled": True
     },
     "news_queue": {
-        "interval": 1,  # minutes
+        "interval": 10,  # minutes
         "enabled": True
     }
 }
@@ -99,13 +105,13 @@ async def process_news_queue():
                 logger.error("GOOGLE_API_KEY environment variable not set")
                 return
             
-            # Get relevant posts using ML
-            logger.info("Filtering posts for relevance")
+            # Get relevant posts using ML - process all posts at once
+            logger.info("Filtering posts for relevance using batch processing")
             if os.getenv("USE_MOCK_ML") == "true":
                 # Use mock function for testing
                 relevant_urls = mock_get_relevant_posts(processed_posts)
             else:
-                # Use actual ML function
+                # Use actual ML function with batch processing
                 relevant_urls = get_relevant_posts(processed_posts, api_key)
             
             logger.info(f"Found {len(relevant_urls)} relevant posts")
@@ -127,8 +133,12 @@ async def process_news_queue():
                             post.full_text = scraper.fetch_post_full_text(post.url)
                             news_queue.db_handler.update_post(post)
                         
-                        # Get translations
+                        # Get translations with cooldown to respect API limits
                         logger.info(f"Getting translations for: {post.title}")
+                        
+                        # Add a small cooldown between translation calls
+                        time.sleep(1.5)  # 1.5 second cooldown between translation calls
+                        
                         uk_title, en_text, uk_text = get_article_translation(
                             api_key, post.title, post.full_text
                         )
