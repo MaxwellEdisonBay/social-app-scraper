@@ -15,6 +15,7 @@ from handlers.ml_handler import (get_article_translation, get_relevant_posts,
 from handlers.news_queue import NewsQueue
 from handlers.telegram_handler import TelegramHandler
 from scrapers.bbc_scraper import BBCScraper
+from scrapers.toronto_star_scraper import TorontoStarScraper
 
 # Load environment variables from .env file
 load_dotenv()
@@ -37,17 +38,22 @@ telegram_handler = TelegramHandler()
 
 # Initialize scrapers
 scrapers = {
-    "bbc": BBCScraper(enable_caching=True, max_posts=100)
+    "bbc": BBCScraper(enable_caching=True, max_posts=100),
+    "toronto_star": TorontoStarScraper(enable_caching=True, max_posts=100)
 }
 
 # Configuration for scheduling
 SCHEDULE_CONFIG = {
     "bbc": {
-        "interval": 30,  # minutes
+        "interval": 1,  # minutes
+        "enabled": True
+    },
+    "toronto_star": {
+        "interval": 1,  # minutes
         "enabled": True
     },
     "news_queue": {
-        "interval": 10,  # minutes
+        "interval": 1,  # minutes
         "enabled": True
     }
 }

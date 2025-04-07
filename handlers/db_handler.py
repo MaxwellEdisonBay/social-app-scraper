@@ -27,7 +27,7 @@ class DatabaseHandler:
                     url TEXT UNIQUE NOT NULL,
                     title TEXT NOT NULL,
                     desc TEXT NOT NULL,
-                    image_url TEXT NOT NULL,
+                    image_url TEXT,
                     english_summary TEXT,
                     ukrainian_title TEXT,
                     ukrainian_summary TEXT,

@@ -81,13 +81,15 @@ class TelegramHandler:
         chat_id = 364795443
         message = self._format_post_message(post)
         
-        # Create inline keyboard with Approve button
-        keyboard = [
-            [
-                InlineKeyboardButton("✅ Approve", callback_data=f"approve_{post.url}")
+        # Only add approve button if URL is short enough (less than 64 bytes)
+        reply_markup = None
+        if len(post.url) < 64:
+            keyboard = [
+                [
+                    InlineKeyboardButton("✅ Approve", callback_data=f"approve_{post.url}")
+                ]
             ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+            reply_markup = InlineKeyboardMarkup(keyboard)
         
         if await self.send_message(chat_id, message, reply_markup=reply_markup):
             logger.info(f"Broadcasted post to chat ID {chat_id}")
