@@ -14,6 +14,7 @@ from handlers.ml_handler import (get_article_translation, get_relevant_posts,
                                  mock_get_relevant_posts)
 from handlers.news_queue import NewsQueue
 from handlers.telegram_handler import TelegramHandler
+from handlers.api_handler import APIHandler
 from scrapers.bbc_scraper import BBCScraper
 from scrapers.toronto_star_scraper import TorontoStarScraper
 from scrapers.ircc_scraper import IRCCScraper
@@ -36,6 +37,7 @@ logger = logging.getLogger("scheduler")
 db_handler = DatabaseHandler(max_posts=100)
 news_queue = NewsQueue(max_posts=100)
 telegram_handler = TelegramHandler()
+api_handler = APIHandler()
 
 # Initialize scrapers
 scrapers = {
@@ -153,6 +155,14 @@ async def process_news_queue():
                             logger.info(f"Sending post to Telegram subscribers: {post.title}")
                             sent_count = await telegram_handler.broadcast_post(post, source=post.source)
                             logger.info(f"Broadcasted post to {sent_count} subscribers")
+                            
+                            # Send to news service API
+                            logger.info(f"Sending post to news service: {post.title}")
+                            api_result = api_handler.add_post(post)
+                            if api_result:
+                                logger.info(f"Successfully sent post to news service: {post.title}")
+                            else:
+                                logger.error(f"Failed to send post to news service: {post.title}")
                         else:
                             logger.error(f"Failed to get translations for: {post.title}")
                     else:
