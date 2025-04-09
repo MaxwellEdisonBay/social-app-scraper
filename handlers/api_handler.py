@@ -52,15 +52,15 @@ class APIHandler:
         """
         # Map the post to the API format
         api_post = {
-            "text": post.desc or "",  # Use description as text
+            "text": post.desc or post.english_summary,  # Use description as text
             "type": "news",  # Assuming news is a valid PostTypes value
             "author": self.author_id,  # Default author
             "children": [],  # No children posts
             "title": post.title,
-            "titleUk": post.ukrainian_title if hasattr(post, 'ukrainian_title') else None,
-            "textUk": post.ukrainian_summary if hasattr(post, 'ukrainian_summary') else None,
-            "richText": post.english_summary if hasattr(post, 'english_summary') else None,
-            "richTextUk": post.ukrainian_summary if hasattr(post, 'ukrainian_summary') else None,
+            "titleUk": post.ukrainian_title,
+            "textUk": post.ukrainian_summary,
+            "richText": post.english_summary,
+            "richTextUk": post.ukrainian_summary,
             "mediaUrls": [post.image_url] if post.image_url else [],
             "newsOriginalUrl": post.url,  # Add the original URL of the news article
             "newsSource": post.source.upper() if post.source else None,  # Add the source of the news article

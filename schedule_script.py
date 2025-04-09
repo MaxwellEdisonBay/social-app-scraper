@@ -146,9 +146,9 @@ async def process_news_queue():
                         )
                         
                         if uk_title and en_text and uk_text:
-                            post.uk_title = uk_title
-                            post.en_text = en_text
-                            post.uk_text = uk_text
+                            post.ukrainian_title = uk_title
+                            post.english_summary = en_text
+                            post.ukrainian_summary = uk_text
                             news_queue.db_handler.update_post(post)
                             
                             # Send to Telegram subscribers

@@ -1,12 +1,31 @@
-version: '3.8'
-
 services:
   scraper:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: social-app-scraper
+    restart: unless-stopped
     volumes:
-      - data_volume:/data  # Mounts the named volume to /data
+      - social_app_data:/app/data  # Named volume for persistent data
+      - social_app_logs:/app/logs  # Named volume for logs
     env_file: ".env"
+    environment:
+      - DB_PATH=/app/data/news_cache.db
+      - NEWS_QUEUE_DB_PATH=/app/data/news_queue.db
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; exit(0 if os.path.exists('/app/data/news_cache.db') else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
-  data_volume:
+  social_app_data:
+    name: social_app_data
+  social_app_logs:
+    name: social_app_logs
