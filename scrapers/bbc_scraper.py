@@ -34,17 +34,32 @@ class BBCScraper(BaseScraper):
                                              recursive=True)  # find all the promo divs that contain articles.
 
             for element in article_elements:
+                # Try to find a regular image first
                 image_el = element.find("img")
+                
+                # If no regular image, look for a video preview image
+                if not image_el or not image_el.get("src"):
+                    image_el = element.find("img", class_="holding_image")
+                
                 link_el = element.find("a")
                 title_el = element.find("h2") 
                 desc_el = element.find("p")
-                if link_el.get("href") is not None and image_el.get("src") is not None:
+                
+                # Check if we have a valid link and either a regular image or video preview
+                if link_el and link_el.get("href") and (image_el and image_el.get("src")):
+                    # Get the image URL
+                    image_url = image_el.get("src")
+                    
+                    # If the image URL is relative, make it absolute
+                    if not image_url.startswith('http'):
+                        image_url = base_url + image_url
+                    
                     articles.append(
                         Post(
                             url=base_url + link_el.get("href"),
-                            title=title_el.text,
-                            desc=desc_el.text,
-                            image_url=base_url + image_el.get("src"),
+                            title=title_el.text if title_el else "No title available",
+                            desc=desc_el.text if desc_el else "No description available",
+                            image_url=image_url,
                             created_at=datetime.now(),
                             source='bbc'
                         )
