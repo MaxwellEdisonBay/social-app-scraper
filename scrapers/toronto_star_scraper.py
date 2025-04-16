@@ -53,7 +53,23 @@ class TorontoStarScraper(BaseScraper):
                     # Extract image URL
                     img_elem = article.find('img', class_='img-responsive')
                     image_url = None
-                    if img_elem:
+                    
+                    # First try to find schema.org ImageObject
+                    image_object = article.find('div', {'itemtype': 'https://schema.org/ImageObject'})
+                    if image_object:
+                        # Try to get contentUrl from meta tag
+                        content_url_meta = image_object.find('meta', {'itemprop': 'contentUrl'})
+                        if content_url_meta:
+                            image_url = content_url_meta.get('content')
+                        
+                        # If not found, try to get url from meta tag
+                        if not image_url:
+                            url_meta = image_object.find('meta', {'itemprop': 'url'})
+                            if url_meta:
+                                image_url = url_meta.get('content')
+                    
+                    # If schema.org method failed, try the traditional method
+                    if not image_url and img_elem:
                         # Try to get the src attribute first
                         image_url = img_elem.get('src')
                         # If not found, try data-src
@@ -65,13 +81,13 @@ class TorontoStarScraper(BaseScraper):
                             # Get the first URL from srcset
                             if srcset:
                                 image_url = srcset.split(',')[0].split(' ')[0]
-                        
-                        # Ensure the URL is absolute
-                        if image_url and not image_url.startswith('http'):
-                            if image_url.startswith('//'):
-                                image_url = 'https:' + image_url
-                            else:
-                                image_url = 'https://' + image_url.lstrip('/')
+                    
+                    # Ensure the URL is absolute
+                    if image_url and not image_url.startswith('http'):
+                        if image_url.startswith('//'):
+                            image_url = 'https:' + image_url
+                        else:
+                            image_url = 'https://' + image_url.lstrip('/')
                     
                     # Extract timestamp
                     time_elem = article.find('time', class_='tnt-date')
@@ -120,6 +136,37 @@ class TorontoStarScraper(BaseScraper):
             # Force UTF-8 encoding
             response.encoding = 'utf-8'
             soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Extract image URL from schema.org metadata
+            image_url = None
+            image_container = soup.find('div', class_='image')
+            if image_container:
+                # Look for schema.org ImageObject
+                image_object = image_container.find('div', {'itemtype': 'https://schema.org/ImageObject'})
+                if image_object:
+                    # Try to get contentUrl from meta tag
+                    content_url_meta = image_object.find('meta', {'itemprop': 'contentUrl'})
+                    if content_url_meta:
+                        image_url = content_url_meta.get('content')
+                    
+                    # If not found, try to get url from meta tag
+                    if not image_url:
+                        url_meta = image_object.find('meta', {'itemprop': 'url'})
+                        if url_meta:
+                            image_url = url_meta.get('content')
+                    
+                    # If still not found, try to get src from img tag
+                    if not image_url:
+                        img_tag = image_object.find('img')
+                        if img_tag:
+                            image_url = img_tag.get('src')
+                            
+                            # If the URL is relative, make it absolute
+                            if image_url and not image_url.startswith('http'):
+                                if image_url.startswith('//'):
+                                    image_url = 'https:' + image_url
+                                else:
+                                    image_url = 'https://' + image_url.lstrip('/')
             
             # First try to find the main article content container
             article_body = None
@@ -247,6 +294,15 @@ class TorontoStarScraper(BaseScraper):
             # If we still don't have any text, return a default message
             if not final_text:
                 return "Article content could not be extracted."
+            
+            # If we found an image URL, update the post in the database
+            if image_url:
+                # Find the post in the database by URL
+                post = self.db_handler.get_post_by_url(url)
+                if post:
+                    post.image_url = image_url
+                    self.db_handler.update_post(post)
+                    print(f"Updated image URL for post: {post.title}")
             
             return final_text
             
