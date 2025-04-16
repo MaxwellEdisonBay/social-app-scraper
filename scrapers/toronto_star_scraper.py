@@ -70,17 +70,58 @@ class TorontoStarScraper(BaseScraper):
                     
                     # If schema.org method failed, try the traditional method
                     if not image_url and img_elem:
-                        # Try to get the src attribute first
-                        image_url = img_elem.get('src')
-                        # If not found, try data-src
-                        if not image_url:
-                            image_url = img_elem.get('data-src')
-                        # If still not found, try data-srcset
+                        # Check if src is a base64 image
+                        src = img_elem.get('src', '')
+                        is_base64 = src.startswith('data:image')
+                        
+                        # If src is a base64 image or empty, prioritize srcset
+                        if is_base64 or not src:
+                            # Try to get the highest quality image from srcset
+                            srcset = img_elem.get('srcset', '')
+                            if srcset:
+                                try:
+                                    print(f"Processing srcset: {srcset}")
+                                    # Split srcset into individual URLs and find the highest resolution
+                                    # Format: "url1 size1w, url2 size2w, ..."
+                                    srcset_parts = [part.strip().split(" ") for part in srcset.split(",")]
+                                    print(f"Srcset parts: {srcset_parts}")
+                                    # Filter out any malformed entries and extract width numbers
+                                    valid_parts = []
+                                    for parts in srcset_parts:
+                                        if len(parts) >= 2:
+                                            url = parts[0]
+                                            size_str = parts[1]
+                                            if size_str.endswith('w'):
+                                                try:
+                                                    width = int(size_str.replace('w', ''))
+                                                    valid_parts.append((url, width))
+                                                    print(f"Valid part: {url} - {width}w")
+                                                except ValueError:
+                                                    print(f"Could not parse width from {size_str}")
+                                    
+                                    if valid_parts:
+                                        # Sort by width and get the URL with the highest width
+                                        image_url = max(valid_parts, key=lambda x: x[1])[0]
+                                        print(f"Selected highest quality image: {image_url}")
+                                    else:
+                                        print("No valid parts found in srcset")
+                                except (ValueError, IndexError) as e:
+                                    print(f"Error parsing srcset: {e}")
+                        
+                        # If still no image URL, try data-srcset
                         if not image_url and img_elem.get('data-srcset'):
                             srcset = img_elem.get('data-srcset')
                             # Get the first URL from srcset
                             if srcset:
                                 image_url = srcset.split(',')[0].split(' ')[0]
+                        
+                        # If still no image URL, try data-src
+                        if not image_url:
+                            image_url = img_elem.get('data-src')
+                        
+                        # If still no image URL and src is not base64, use src
+                        if not image_url and not is_base64:
+                            image_url = src
                     
                     # Ensure the URL is absolute
                     if image_url and not image_url.startswith('http'):
@@ -159,7 +200,58 @@ class TorontoStarScraper(BaseScraper):
                     if not image_url:
                         img_tag = image_object.find('img')
                         if img_tag:
-                            image_url = img_tag.get('src')
+                            # Check if src is a base64 image
+                            src = img_tag.get('src', '')
+                            is_base64 = src.startswith('data:image')
+                            
+                            # If src is a base64 image or empty, prioritize srcset
+                            if is_base64 or not src:
+                                # Try to get the highest quality image from srcset
+                                srcset = img_tag.get('srcset', '')
+                                if srcset:
+                                    try:
+                                        print(f"Processing srcset: {srcset}")
+                                        # Split srcset into individual URLs and find the highest resolution
+                                        # Format: "url1 size1w, url2 size2w, ..."
+                                        srcset_parts = [part.strip().split(" ") for part in srcset.split(",")]
+                                        print(f"Srcset parts: {srcset_parts}")
+                                        # Filter out any malformed entries and extract width numbers
+                                        valid_parts = []
+                                        for parts in srcset_parts:
+                                            if len(parts) >= 2:
+                                                url = parts[0]
+                                                size_str = parts[1]
+                                                if size_str.endswith('w'):
+                                                    try:
+                                                        width = int(size_str.replace('w', ''))
+                                                        valid_parts.append((url, width))
+                                                        print(f"Valid part: {url} - {width}w")
+                                                    except ValueError:
+                                                        print(f"Could not parse width from {size_str}")
+                                        
+                                        if valid_parts:
+                                            # Sort by width and get the URL with the highest width
+                                            image_url = max(valid_parts, key=lambda x: x[1])[0]
+                                            print(f"Selected highest quality image: {image_url}")
+                                        else:
+                                            print("No valid parts found in srcset")
+                                    except (ValueError, IndexError) as e:
+                                        print(f"Error parsing srcset: {e}")
+                            
+                            # If still no image URL, try data-srcset
+                            if not image_url and img_tag.get('data-srcset'):
+                                srcset = img_tag.get('data-srcset')
+                                # Get the first URL from srcset
+                                if srcset:
+                                    image_url = srcset.split(',')[0].split(' ')[0]
+                            
+                            # If still no image URL, try data-src
+                            if not image_url:
+                                image_url = img_tag.get('data-src')
+                            
+                            # If still no image URL and src is not base64, use src
+                            if not image_url and not is_base64:
+                                image_url = src
                             
                             # If the URL is relative, make it absolute
                             if image_url and not image_url.startswith('http'):
