@@ -45,7 +45,8 @@ class BBCScraper(BaseScraper):
                             title=title_el.text,
                             desc=desc_el.text,
                             image_url=base_url + image_el.get("src"),
-                            created_at=datetime.now()
+                            created_at=datetime.now(),
+                            source='bbc'
                         )
                     )
             return articles

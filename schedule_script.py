@@ -34,8 +34,8 @@ logging.basicConfig(
 logger = logging.getLogger("scheduler")
 
 # Initialize shared components
-db_handler = DatabaseHandler(max_posts=100)
-news_queue = NewsQueue(max_posts=100)
+db_handler = DatabaseHandler(max_posts=1000)
+news_queue = NewsQueue(max_posts=1000)
 telegram_handler = TelegramHandler()
 api_handler = APIHandler()
 

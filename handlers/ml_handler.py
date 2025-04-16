@@ -81,47 +81,56 @@ def get_relevant_posts(posts: List[Post], api_key: str) -> List[str]:
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel('gemini-2.0-flash')
 
+    # Shuffle the posts to ensure a mix of sources in each batch
+    import random
+    shuffled_posts = posts.copy()
+    random.shuffle(shuffled_posts)
+
     # Process posts in batches of 10 to respect rate limits
-    batch_size = 10
+    batch_size = 40
     relevant_urls = []
     
-    for i in range(0, len(posts), batch_size):
-        batch = posts[i:i+batch_size]
-        print(f"\nProcessing batch {i//batch_size + 1} of {(len(posts) + batch_size - 1)//batch_size}")
+    for i in range(0, len(shuffled_posts), batch_size):
+        batch = shuffled_posts[i:i+batch_size]
+        print(f"\nProcessing batch {i//batch_size + 1} of {(len(shuffled_posts) + batch_size - 1)//batch_size}")
         
         # Create a prompt that handles multiple posts in one API call
         batch_prompt = (
-            "You are a highly selective news curator for a Ukrainian community website in Canada. "
-            "Your primary goal is to identify the most critical and impactful news stories "
-            "that directly affect both the Ukrainian-Canadian community and Canadians in general. "
-            "Quality over quantity is essential.\n\n"
-            "Analyze the following news posts and select ONLY those that meet these strict criteria:\n"
-            "1. HIGHEST PRIORITY (Must include if found):\n"
-            "   - New Canadian policies/programs for Ukrainians (immigration, settlement, support)\n"
-            "   - Critical updates affecting Ukrainian newcomers in Canada\n"
-            "   - Canadian government responses to the Ukraine conflict (sanctions, aid, diplomatic actions)\n"
-            "   - Major changes to Canadian immigration policies that affect all newcomers\n"
-            "   - Significant economic policies that impact cost of living and housing\n"
-            "2. HIGH PRIORITY (Include if truly significant):\n"
-            "   - Major Canadian policy changes that directly impact immigrant communities\n"
-            "   - Significant Canada-Ukraine cooperation and support initiatives\n"
-            "   - Important developments in Canadian humanitarian assistance\n"
-            "   - Critical updates on healthcare, education, or social services that affect newcomers\n"
-            "   - Major changes to employment or business regulations that impact immigrants\n"
-            "3. MEDIUM PRIORITY (Include if highly relevant):\n"
-            "   - Important updates on housing affordability and availability\n"
-            "   - Significant changes to Canadian foreign policy\n"
-            "   - Major economic indicators that affect daily life (inflation, interest rates)\n"
-            "   - Updates on Canadian support for Ukraine's reconstruction\n\n"
+            "You are a news curator for a Ukrainian community website in Canada. "
+            "Your goal is to identify the most relevant and engaging news stories "
+            "that would interest the Ukrainian-Canadian community while also including "
+            "some general remarkable content that everyone would find interesting.\n\n"
+            "Analyze the following news posts and select those that meet these criteria:\n"
+            "1. UKRAINIAN COMMUNITY PRIORITY (Must include if found):\n"
+            "   - New Canadian policies/programs for Ukrainians\n"
+            "   - Updates affecting Ukrainian newcomers in Canada\n"
+            "   - Canadian government responses to the Ukraine situation\n"
+            "   - Ukrainian cultural events and community gatherings\n"
+            "   - Success stories of Ukrainian newcomers\n"
+            "2. IMMIGRATION & SETTLEMENT (Include if relevant):\n"
+            "   - Changes to Canadian immigration policies\n"
+            "   - Updates on healthcare, education, or social services\n"
+            "   - Housing and employment opportunities\n"
+            "   - Integration support programs\n"
+            "3. REMARKABLE GENERAL NEWS (Include if truly interesting):\n"
+            "   - Major Canadian policy changes that affect everyone\n"
+            "   - Significant economic developments\n"
+            "   - Notable cultural events and festivals\n"
+            "   - Interesting local stories\n"
+            "4. ENTERTAINING CONTENT (Include 1-2 if available):\n"
+            "   - Heartwarming or funny local stories\n"
+            "   - Cultural exchanges and community initiatives\n"
+            "   - Positive integration stories\n"
+            "   - Interesting or unusual news that would spark discussion\n\n"
             "DO NOT include:\n"
             "- News about the conflict itself unless directly tied to Canadian response\n"
-            "- General Canadian news unless extremely impactful for the community\n"
             "- Multiple articles covering the same topic\n"
-            "- Any news that isn't immediately relevant to Ukrainian-Canadians or Canadians in general\n\n"
-            "Return a JSON array with URLs of ONLY the most crucial stories (maximum 6).\n"
-            "If no posts meet these high standards, return an empty array [].\n\n"
+            "- Content that could be distressing or inappropriate\n"
+            "- Generic news without any remarkable aspect\n\n"
+            "Return a JSON array with URLs of the most relevant stories (maximum 6).\n"
+            "If no posts meet these standards, return an empty array [].\n\n"
             "IMPORTANT: Return ONLY a JSON array, no additional text or formatting.\n"
-            "Example: [\"https://example.com/crucial-canadian-story\"]\n\n"
+            "Example: [\"https://example.com/interesting-story\"]\n\n"
             "Posts to analyze:\n"
         )
         
@@ -142,13 +151,33 @@ def get_relevant_posts(posts: List[Post], api_key: str) -> List[str]:
             
             # Try to extract URLs from the response
             try:
-                # Clean the response text by removing markdown code block markers if present
+                # Clean the response text
                 clean_text = response.text.strip()
+                
+                # Remove markdown code block markers if present
                 if clean_text.startswith('```json'):
-                    clean_text = clean_text[7:]  # Remove ```json
+                    clean_text = clean_text[7:]
                 if clean_text.endswith('```'):
-                    clean_text = clean_text[:-3]  # Remove ```
+                    clean_text = clean_text[:-3]
                 clean_text = clean_text.strip()
+                
+                # Fix common JSON issues
+                # Replace escaped newlines with actual newlines
+                clean_text = clean_text.replace('\\n', '\n')
+                # Replace escaped quotes with actual quotes
+                clean_text = clean_text.replace('\\"', '"')
+                # Replace escaped backslashes with actual backslashes
+                clean_text = clean_text.replace('\\\\', '\\')
+                
+                # Remove control characters
+                import re
+                clean_text = re.sub(r'[\x00-\x1F\x7F-\x9F]', '', clean_text)
+                
+                # Fix common JSON formatting issues
+                clean_text = re.sub(r',\s*}', '}', clean_text)  # Remove trailing commas
+                clean_text = re.sub(r',\s*]', ']', clean_text)  # Remove trailing commas in arrays
+                clean_text = re.sub(r'}\s*{', '},{', clean_text)  # Fix missing commas between objects
+                clean_text = re.sub(r']\s*{', '],{', clean_text)  # Fix missing commas between array and object
                 
                 urls = json.loads(clean_text)
                 if isinstance(urls, list):
@@ -298,28 +327,73 @@ Original text:
         # Replace escaped backslashes with actual backslashes
         clean_text = clean_text.replace('\\\\', '\\')
         
+        # Remove control characters while preserving newlines and tabs
+        import re
+        clean_text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]', '', clean_text)
+        
+        # Fix common JSON formatting issues
+        clean_text = re.sub(r',\s*}', '}', clean_text)  # Remove trailing commas
+        clean_text = re.sub(r',\s*]', ']', clean_text)  # Remove trailing commas in arrays
+        clean_text = re.sub(r'}\s*{', '},{', clean_text)  # Fix missing commas between objects
+        clean_text = re.sub(r']\s*{', '],{', clean_text)  # Fix missing commas between array and object
+        
+        # Validate HTML tags in the text
+        def validate_html_tags(text):
+            # Check for unclosed tags
+            open_tags = re.findall(r'<([^/][^>]*)>', text)
+            close_tags = re.findall(r'</([^>]+)>', text)
+            
+            # Count opening and closing tags
+            tag_counts = {}
+            for tag in open_tags:
+                tag_name = tag.split()[0]  # Get tag name without attributes
+                tag_counts[tag_name] = tag_counts.get(tag_name, 0) + 1
+            for tag in close_tags:
+                tag_name = tag.split()[0]
+                tag_counts[tag_name] = tag_counts.get(tag_name, 0) - 1
+            
+            # Check for mismatched tags
+            for tag, count in tag_counts.items():
+                if count != 0:
+                    print(f"Warning: Mismatched HTML tags for '{tag}'")
+                    return False
+            return True
+        
         # Try to parse the JSON
         try:
             result = json.loads(clean_text)
+            
+            # Validate HTML in each field
+            for field in ['uk_title', 'en_title', 'en_text', 'uk_text']:
+                if field in result and not validate_html_tags(result[field]):
+                    print(f"Warning: Invalid HTML in {field}")
+                    # Try to fix common HTML issues
+                    result[field] = re.sub(r'<([^>]+)>', lambda m: m.group(0).replace(' ', ''), result[field])
+                    result[field] = re.sub(r'</\s+([^>]+)>', lambda m: f'</{m.group(1)}>', result[field])
+            
         except json.JSONDecodeError as e:
             print(f"Error parsing JSON: {e}")
-            print(f"Cleaned text: {clean_text}")
-            
             # Try to extract the fields using regex as a fallback
-            import re
-            
             uk_title_match = re.search(r'"uk_title"\s*:\s*"([^"]*)"', clean_text)
             en_title_match = re.search(r'"en_title"\s*:\s*"([^"]*)"', clean_text)
             en_text_match = re.search(r'"en_text"\s*:\s*"([^"]*)"', clean_text)
             uk_text_match = re.search(r'"uk_text"\s*:\s*"([^"]*)"', clean_text)
             
             if uk_title_match and en_title_match and en_text_match and uk_text_match:
-                return (
+                # Validate HTML in extracted fields
+                fields = [
                     uk_title_match.group(1),
                     en_title_match.group(1),
                     en_text_match.group(1),
                     uk_text_match.group(1)
-                )
+                ]
+                for i, field in enumerate(fields):
+                    if not validate_html_tags(field):
+                        print(f"Warning: Invalid HTML in extracted field {i}")
+                        # Try to fix common HTML issues
+                        fields[i] = re.sub(r'<([^>]+)>', lambda m: m.group(0).replace(' ', ''), field)
+                        fields[i] = re.sub(r'</\s+([^>]+)>', lambda m: f'</{m.group(1)}>', field)
+                return tuple(fields)
             else:
                 # If we can't extract the fields, return None
                 print("Could not extract fields using regex")
