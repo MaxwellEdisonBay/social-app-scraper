@@ -67,16 +67,24 @@ class APIHandler:
                 # Simple HTML stripping - in production you might want to use a proper HTML parser
                 en_text_plain = post.en_text.replace('<h1>', '').replace('</h1>', '\n')
                 en_text_plain = en_text_plain.replace('<h2>', '').replace('</h2>', '\n')
-                en_text_plain = en_text_plain.replace('<h3>', '').replace('</h3>', '\n')
                 en_text_plain = en_text_plain.replace('<p>', '').replace('</p>', '\n')
-                en_text_plain = en_text_plain.replace('<bold>', '').replace('</bold>', '')
-                en_text_plain = en_text_plain.replace('<italic>', '').replace('</italic>', '')
+                en_text_plain = en_text_plain.replace('<strong>', '').replace('</strong>', '')
+                en_text_plain = en_text_plain.replace('<em>', '').replace('</em>', '')
+                en_text_plain = en_text_plain.replace('<s>', '').replace('</s>', '')
                 en_text_plain = en_text_plain.replace('<ul>', '').replace('</ul>', '\n')
+                en_text_plain = en_text_plain.replace('<ol>', '').replace('</ol>', '\n')
                 en_text_plain = en_text_plain.replace('<li>', '- ').replace('</li>', '\n')
+                en_text_plain = en_text_plain.replace('<blockquote>', '> ').replace('</blockquote>', '\n')
+                en_text_plain = en_text_plain.replace('<code>', '').replace('</code>', '')
                 en_text_plain = en_text_plain.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n')
-                # Remove any remaining HTML tags
+                
+                # Handle links - extract the text but not the URL
                 import re
+                en_text_plain = re.sub(r'<a[^>]*>(.*?)</a>', r'\1', en_text_plain)
+                
+                # Remove any remaining HTML tags
                 en_text_plain = re.sub(r'<[^>]+>', '', en_text_plain)
+                
                 # Clean up multiple newlines
                 en_text_plain = re.sub(r'\n\s*\n', '\n\n', en_text_plain)
             else:
@@ -89,16 +97,24 @@ class APIHandler:
                 # Simple HTML stripping - in production you might want to use a proper HTML parser
                 uk_text_plain = post.uk_text.replace('<h1>', '').replace('</h1>', '\n')
                 uk_text_plain = uk_text_plain.replace('<h2>', '').replace('</h2>', '\n')
-                uk_text_plain = uk_text_plain.replace('<h3>', '').replace('</h3>', '\n')
                 uk_text_plain = uk_text_plain.replace('<p>', '').replace('</p>', '\n')
-                uk_text_plain = uk_text_plain.replace('<bold>', '').replace('</bold>', '')
-                uk_text_plain = uk_text_plain.replace('<italic>', '').replace('</italic>', '')
+                uk_text_plain = uk_text_plain.replace('<strong>', '').replace('</strong>', '')
+                uk_text_plain = uk_text_plain.replace('<em>', '').replace('</em>', '')
+                uk_text_plain = uk_text_plain.replace('<s>', '').replace('</s>', '')
                 uk_text_plain = uk_text_plain.replace('<ul>', '').replace('</ul>', '\n')
+                uk_text_plain = uk_text_plain.replace('<ol>', '').replace('</ol>', '\n')
                 uk_text_plain = uk_text_plain.replace('<li>', '- ').replace('</li>', '\n')
+                uk_text_plain = uk_text_plain.replace('<blockquote>', '> ').replace('</blockquote>', '\n')
+                uk_text_plain = uk_text_plain.replace('<code>', '').replace('</code>', '')
                 uk_text_plain = uk_text_plain.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n')
-                # Remove any remaining HTML tags
+                
+                # Handle links - extract the text but not the URL
                 import re
+                uk_text_plain = re.sub(r'<a[^>]*>(.*?)</a>', r'\1', uk_text_plain)
+                
+                # Remove any remaining HTML tags
                 uk_text_plain = re.sub(r'<[^>]+>', '', uk_text_plain)
+                
                 # Clean up multiple newlines
                 uk_text_plain = re.sub(r'\n\s*\n', '\n\n', uk_text_plain)
             else:

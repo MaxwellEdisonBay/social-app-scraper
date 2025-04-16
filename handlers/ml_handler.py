@@ -241,6 +241,22 @@ Styling guidelines:
 10. Use <code> for technical terms, numbers, or data points
 11. Use <a> for linking to related sources or references
 
+CRITICAL REQUIREMENTS:
+1. DO NOT return empty sections. Every section must have content.
+2. Ensure all paragraphs are properly wrapped in <p> tags.
+3. Make sure all lists have proper <ul> or <ol> tags with <li> items.
+4. Format quotes with <blockquote> tags.
+5. Ensure the Ukrainian translation is complete and accurate.
+6. Maintain the same structure and formatting in both English and Ukrainian versions.
+
+TRANSLATION GUIDELINES:
+1. DO NOT translate Canada-specific acronyms, program names, or official terms (e.g., Express Entry, IRCC, PNP, etc.)
+2. Use natural, conversational Ukrainian language that is easy to understand
+3. Make titles engaging and attention-grabbing while maintaining accuracy
+4. Use appropriate Ukrainian idioms and expressions where they fit naturally
+5. Ensure the translation flows well and doesn't sound like a direct translation
+6. Keep the tone professional but accessible
+
 Please format the response as JSON with these keys:
 - uk_title: Ukrainian translation of the title
 - en_title: Improved English title
