@@ -38,14 +38,14 @@ def create_test_post():
         source="test",
         full_text=f"This is the full text of the test post. It contains multiple paragraphs.\n\n"
                   f"Paragraph 2: Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
-                  f"Nullam auctor, nisl eget ultricies tincidunt, nisl nisl aliquam nisl, "
+                  f"Nullam auctor, nisl eget ultricies tidunt, nisl nisl aliquam nisl, "
                   f"eget aliquam nisl nisl eget nisl. This is test {timestamp}.\n\n"
                   f"Paragraph 3: Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. "
                   f"Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut "
                   f"aliquip ex ea commodo consequat. This is test {timestamp}.",
-        ukrainian_title=f"Тестовий пост з перекладами - {timestamp}",
-        english_summary=f"This is an improved English summary of the test post. It contains the main points of the article in a more readable format. This is test {timestamp}.",
-        ukrainian_summary=f"Це покращений український переклад тестового поста. Він містить основні моменти статті в більш читабельному форматі. Це тест {timestamp}."
+        uk_title=f"Тестовий пост з перекладами - {timestamp}",
+        en_text=f"This is an improved English summary of the test post. It contains the main points of the article in a more readable format. This is test {timestamp}.",
+        uk_text=f"Це покращений український переклад тестового поста. Він містить основні моменти статті в більш читабельному форматі. Це тест {timestamp}."
     )
 
 async def test_telegram_handler():

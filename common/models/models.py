@@ -13,10 +13,10 @@ class Post:
     source: Optional[str] = None  # Source of the post (e.g., 'bbc', 'reuters')
     
     # ML-processed content
-    english_title: Optional[str] = None
-    english_summary: Optional[str] = None
-    ukrainian_title: Optional[str] = None
-    ukrainian_summary: Optional[str] = None
+    en_title: Optional[str] = None
+    en_text: Optional[str] = None
+    uk_title: Optional[str] = None
+    uk_text: Optional[str] = None
     
     # Full article content
     full_text: Optional[str] = None  # Full text of the article
@@ -32,10 +32,10 @@ class Post:
         image_url: {self.image_url}
         created_at: {self.created_at}
         source: {self.source}
-        english_title: {self.english_title}
-        english_summary: {self.english_summary}
-        ukrainian_title: {self.ukrainian_title}
-        ukrainian_summary: {self.ukrainian_summary}
+        en_title: {self.en_title}
+        en_text: {self.en_text}
+        uk_title: {self.uk_title}
+        uk_text: {self.uk_text}
         full_text: {self.full_text[:100] + '...' if self.full_text and len(self.full_text) > 100 else self.full_text}
         status: {self.status}
         """

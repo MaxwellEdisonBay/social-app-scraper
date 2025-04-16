@@ -141,14 +141,22 @@ async def process_news_queue():
                         # Add a small cooldown between translation calls
                         time.sleep(1.5)  # 1.5 second cooldown between translation calls
                         
-                        uk_title, en_text, uk_text = get_article_translation(
+                        uk_title, en_title, en_text, uk_text = get_article_translation(
                             api_key, post.title, post.full_text
                         )
                         
-                        if uk_title and en_text and uk_text:
-                            post.ukrainian_title = uk_title
-                            post.english_summary = en_text
-                            post.ukrainian_summary = uk_text
+                        if uk_title and en_title and en_text and uk_text:
+                            # Map the translated fields to the post object
+                            post.uk_title = uk_title
+                            post.en_title = en_title
+                            post.en_text = en_text
+                            post.uk_text = uk_text
+                            
+                            # If post.desc is missing, use english_text as a fallback
+                            if not post.desc:
+                                logger.info(f"Using English text as description for: {post.title}")
+                                post.desc = en_text
+                                
                             news_queue.db_handler.update_post(post)
                             
                             # Send to Telegram subscribers

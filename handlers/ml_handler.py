@@ -124,23 +124,33 @@ def get_relevant_posts(posts: List[Post], api_key: str) -> List[str]:
         # Create a prompt that handles multiple posts in one API call
         batch_prompt = (
             "You are a highly selective news curator for a Ukrainian community website in Canada. "
-            "Your primary goal is to identify ONLY the most critical and impactful Canadian news stories "
-            "that directly affect the Ukrainian-Canadian community. Quality over quantity is essential.\n\n"
+            "Your primary goal is to identify the most critical and impactful news stories "
+            "that directly affect both the Ukrainian-Canadian community and Canadians in general. "
+            "Quality over quantity is essential.\n\n"
             "Analyze the following news posts and select ONLY those that meet these strict criteria:\n"
             "1. HIGHEST PRIORITY (Must include if found):\n"
             "   - New Canadian policies/programs for Ukrainians (immigration, settlement, support)\n"
             "   - Critical updates affecting Ukrainian newcomers in Canada\n"
-            "   - Canadian government responses (sanctions, aid, diplomatic actions)\n"
+            "   - Canadian government responses to the Ukraine conflict (sanctions, aid, diplomatic actions)\n"
+            "   - Major changes to Canadian immigration policies that affect all newcomers\n"
+            "   - Significant economic policies that impact cost of living and housing\n"
             "2. HIGH PRIORITY (Include if truly significant):\n"
             "   - Major Canadian policy changes that directly impact immigrant communities\n"
             "   - Significant Canada-Ukraine cooperation and support initiatives\n"
-            "   - Important developments in Canadian humanitarian assistance\n\n"
+            "   - Important developments in Canadian humanitarian assistance\n"
+            "   - Critical updates on healthcare, education, or social services that affect newcomers\n"
+            "   - Major changes to employment or business regulations that impact immigrants\n"
+            "3. MEDIUM PRIORITY (Include if highly relevant):\n"
+            "   - Important updates on housing affordability and availability\n"
+            "   - Significant changes to Canadian foreign policy\n"
+            "   - Major economic indicators that affect daily life (inflation, interest rates)\n"
+            "   - Updates on Canadian support for Ukraine's reconstruction\n\n"
             "DO NOT include:\n"
             "- News about the conflict itself unless directly tied to Canadian response\n"
-            "- General Canadian news unless extremely impactful for Ukrainian community\n"
+            "- General Canadian news unless extremely impactful for the community\n"
             "- Multiple articles covering the same topic\n"
-            "- Any news that isn't immediately relevant to Ukrainian-Canadians\n\n"
-            "Return a JSON array with URLs of ONLY the most crucial Canadian stories (maximum 3).\n"
+            "- Any news that isn't immediately relevant to Ukrainian-Canadians or Canadians in general\n\n"
+            "Return a JSON array with URLs of ONLY the most crucial stories (maximum 6).\n"
             "If no posts meet these high standards, return an empty array [].\n\n"
             "IMPORTANT: Return ONLY a JSON array, no additional text or formatting.\n"
             "Example: [\"https://example.com/crucial-canadian-story\"]\n\n"
@@ -217,7 +227,7 @@ def get_relevant_posts(posts: List[Post], api_key: str) -> List[str]:
     return list(set(relevant_urls))  # Remove duplicates
 
 
-def get_article_translation(api_key: str, title: str, text: str) -> tuple[str, str, str]:
+def get_article_translation(api_key: str, title: str, text: str) -> tuple[str, str, str, str]:
     """
     Translates and improves article title and text to Ukrainian using Gemini API.
     Also improves the English text to be more readable while maintaining appropriate style.
@@ -228,17 +238,33 @@ def get_article_translation(api_key: str, title: str, text: str) -> tuple[str, s
         text (str): Original article text in English
         
     Returns:
-        tuple[str, str, str]: (Ukrainian title, Improved English text, Ukrainian text)
+        tuple[str, str, str, str]: (Ukrainian title, Improved English title, Improved English text, Ukrainian text)
     """
     prompt = """Please help translate and improve this article content. The output should:
 1. Translate the title to Ukrainian
-2. Improve the English text to be more readable while maintaining journalistic style
-3. Translate the improved text to Ukrainian
+2. Improve the English title to be more readable while maintaining journalistic style
+3. Improve the English text to be more readable while maintaining journalistic style
+4. Translate the improved text to Ukrainian
+5. Exclude all the personal information and any other generic information that is not relevant to the news
+
+IMPORTANT: Format both the English and Ukrainian text with rich text tags. Use the following tags:
+- <h1> for main headings
+- <h2> for subheadings
+- <p> for paragraphs
+- <bold> for important information
+- <italic> for emphasis
+- <strikethrough> for outdated information
+- <ol> and <li> for numbered lists
+- <ul> and <li> for bullet lists
+- <quote> for direct quotes
+- <code> for technical terms or data
+- <link> for hyperlinks (include the URL in the tag)
 
 Please format the response as JSON with these keys:
 - uk_title: Ukrainian translation of the title
-- en_text: Improved English text
-- uk_text: Ukrainian translation of the improved text
+- en_title: Improved English title
+- en_text: Improved English text with rich text formatting
+- uk_text: Ukrainian translation of the improved text with rich text formatting
 
 Original title: {title}
 
@@ -286,34 +312,37 @@ Original text:
             import re
             
             uk_title_match = re.search(r'"uk_title"\s*:\s*"([^"]*)"', clean_text)
+            en_title_match = re.search(r'"en_title"\s*:\s*"([^"]*)"', clean_text)
             en_text_match = re.search(r'"en_text"\s*:\s*"([^"]*)"', clean_text)
             uk_text_match = re.search(r'"uk_text"\s*:\s*"([^"]*)"', clean_text)
             
-            if uk_title_match and en_text_match and uk_text_match:
+            if uk_title_match and en_title_match and en_text_match and uk_text_match:
                 return (
                     uk_title_match.group(1),
+                    en_title_match.group(1),
                     en_text_match.group(1),
                     uk_text_match.group(1)
                 )
             else:
                 # If we can't extract the fields, return None
                 print("Could not extract fields using regex")
-                return None, None, None
+                return None, None, None, None
         
         # Check if all required fields are present
-        if 'uk_title' in result and 'en_text' in result and 'uk_text' in result:
+        if 'uk_title' in result and 'en_title' in result and 'en_text' in result and 'uk_text' in result:
             return (
                 result['uk_title'],
+                result['en_title'],
                 result['en_text'], 
                 result['uk_text']
             )
         else:
             print(f"Missing required fields in JSON: {result}")
-            return None, None, None
+            return None, None, None, None
         
     except Exception as e:
         print(f"Error translating article: {e}")
-        return None, None, None
+        return None, None, None, None
 
 
 if __name__ == "__main__":
@@ -422,12 +451,13 @@ if __name__ == "__main__":
     print(test_article)
     
     try:
-        uk_title, en_text, uk_text = get_article_translation(API_KEY, test_title, test_article)
+        uk_title, en_title, en_text, uk_text = get_article_translation(API_KEY, test_title, test_article)
         
-        if uk_title and en_text and uk_text:
+        if uk_title and en_title and en_text and uk_text:
             print("\nTranslation Results:")
             print("-" * 50)
             print("Ukrainian Title:", uk_title)
+            print("Improved English Title:", en_title)
             print("\nImproved English Text:")
             print(en_text)
             print("\nUkrainian Text:")

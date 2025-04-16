@@ -122,24 +122,21 @@ class TelegramHandler:
         # Start with the title
         message = f"<b>{truncate(post.title, TITLE_LIMIT)}</b>\n\n"
         
-        # Add Ukrainian title if available (check both old and new field names)
-        uk_title = getattr(post, 'ukrainian_title', None) or getattr(post, 'uk_title', None)
-        if uk_title:
-            message += f"<b>Українською:</b> {truncate(uk_title, TITLE_LIMIT)}\n\n"
+        # Add Ukrainian title if available
+        if post.uk_title:
+            message += f"<b>Українською:</b> {truncate(post.uk_title, TITLE_LIMIT)}\n\n"
             
         # Add description
         if post.desc:
             message += f"{truncate(post.desc, DESC_LIMIT)}\n\n"
             
-        # Add English summary if available (check both old and new field names)
-        en_summary = getattr(post, 'english_summary', None) or getattr(post, 'en_text', None)
-        if en_summary:
-            message += f"<b>English Summary:</b>\n{truncate(en_summary, SUMMARY_LIMIT)}\n\n"
+        # Add English text if available
+        if post.en_text:
+            message += f"<b>English Summary:</b>\n{truncate(post.en_text, SUMMARY_LIMIT)}\n\n"
             
-        # Add Ukrainian summary if available (check both old and new field names)
-        uk_summary = getattr(post, 'ukrainian_summary', None) or getattr(post, 'uk_text', None)
-        if uk_summary:
-            message += f"<b>Український переклад:</b>\n{truncate(uk_summary, SUMMARY_LIMIT)}\n\n"
+        # Add Ukrainian text if available
+        if post.uk_text:
+            message += f"<b>Український переклад:</b>\n{truncate(post.uk_text, SUMMARY_LIMIT)}\n\n"
             
         # Add source and link
         message += f"<b>Source:</b> {post.source}\n"

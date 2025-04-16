@@ -42,34 +42,40 @@ class APIHandler:
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     
-    def _map_post_to_api_format(self, post: Post) -> Dict[str, Any]:
+    def _map_post_to_api_format(self, post: Post) -> dict:
         """
-        Map a Post object to the API format.
+        Maps a Post object to the API format.
         
         Args:
             post (Post): The post to map
             
         Returns:
-            Dict[str, Any]: The mapped post data
+            dict: The post in API format
         """
-        # Map the post to the API format
+        # Ensure required fields are present
+        if not post.url:
+            raise ValueError("Post URL is required")
+            
+        # Map the post to API format
         api_post = {
-            "text": post.desc or "",  # Use description as text
-            "type": "news",  # Assuming news is a valid PostTypes value
-            "author": self.author_id,  # Default author
-            "children": [],  # No children posts
-            "title": post.title,
-            "titleUk": post.uk_title if hasattr(post, 'uk_title') else None,
-            "textUk": post.uk_text if hasattr(post, 'uk_text') else None,
-            "richText": post.en_text if hasattr(post, 'en_text') else None,
-            "richTextUk": post.uk_text if hasattr(post, 'uk_text') else None,
-            "mediaUrls": [],  # Will be populated after image upload
-            "newsOriginalUrl": post.url,  # Add the original URL of the news article
-            "newsSource": post.source.upper() if post.source else None,  # Add the source of the news article
+            'text': post.en_text if hasattr(post, 'en_text') else None,
+            'type': 'news',
+            'author': self.author_id,  # Use author_id from .env
+            'children': [],  # Empty array for news posts
+            'richText': post.en_text if hasattr(post, 'en_text') else None,
+            'textUk': post.uk_text if hasattr(post, 'uk_text') else None,
+            'richTextUk': post.uk_text if hasattr(post, 'uk_text') else None,
+            'title': post.en_title if hasattr(post, 'en_title') else None,
+            'titleUk': post.uk_title if hasattr(post, 'uk_title') else None,
+            'mediaUrls': [post.image_url] if post.image_url else [],
+            'newsOriginalUrl': post.url,
+            'newsSource': post.source if hasattr(post, 'source') else None
         }
         
-        # Remove None values
-        return {k: v for k, v in api_post.items() if v is not None}
+        # Remove None values from optional fields
+        api_post = {k: v for k, v in api_post.items() if v is not None}
+        
+        return api_post
     
     def add_post(self, post: Post) -> Optional[Dict[str, Any]]:
         """
@@ -86,15 +92,44 @@ class APIHandler:
             return None
             
         try:
+            # Validate required fields
+            if not post.title or not post.url:
+                logger.error(f"Skipping post due to missing required fields: {post.url}")
+                logger.error(f"Missing fields: title={bool(post.title)}, url={bool(post.url)}")
+                return None
+                
+            # Check if we have either description or english text
+            if not post.desc and not post.en_text:
+                logger.error(f"Skipping post due to missing both description and english text: {post.url}")
+                return None
+                
+            # Check if translation was successful
+            if not post.uk_title or not post.uk_text or not post.en_text:
+                logger.error(f"Skipping post due to missing translation: {post.url}")
+                logger.error(f"Missing fields: uk_title={bool(post.uk_title)}, "
+                            f"uk_text={bool(post.uk_text)}, "
+                            f"en_text={bool(post.en_text)}")
+                return None
+                
+            # Log post details (truncated for readability)
+            logger.info(f"Processing post: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
+            logger.info(f"URL: {post.url}")
+            
+            # Log description or english text (whichever is available)
+            if post.desc:
+                logger.info(f"Description: {post.desc[:100]}{'...' if len(post.desc) > 100 else ''}")
+            else:
+                logger.info(f"Using English text as description: {post.en_text[:100]}{'...' if len(post.en_text) > 100 else ''}")
+            
             # Upload image if available
             uploaded_image_url = None
             if post.image_url:
-                logger.info(f"Uploading image for post: {post.title}")
+                logger.info(f"Uploading image for post: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
                 uploaded_image_url = self.image_handler.upload_image(post.image_url)
                 if uploaded_image_url:
                     logger.info(f"Image uploaded successfully: {uploaded_image_url}")
                 else:
-                    logger.warning(f"Failed to upload image for post: {post.title}")
+                    logger.warning(f"Failed to upload image for post: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
             
             # Map the post to the API format
             api_post = self._map_post_to_api_format(post)
@@ -103,8 +138,15 @@ class APIHandler:
             if uploaded_image_url:
                 api_post["mediaUrls"] = [uploaded_image_url]
             
+            # Log the request details for debugging
+            logger.info(f"DEBUG - Request details for post: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
+            logger.info(f"DEBUG - API URL: {self.base_url}/en/api/news")
+            logger.info(f"DEBUG - API Key: {self.api_key[:5]}... (truncated)")
+            logger.info(f"DEBUG - Author ID: {self.author_id}")
+            logger.info(f"DEBUG - Request payload: {json.dumps(api_post, indent=2)}")
+            
             # Send the post to the news service
-            logger.info(f"Sending post to news service: {post.title}")
+            logger.info(f"Sending post to news service: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
             response = requests.post(
                 f"{self.base_url}/en/api/news",
                 params={"apiKey": self.api_key},
@@ -113,16 +155,24 @@ class APIHandler:
                 verify=self.verify_ssl,
                 timeout=30
             )
+            
+            # Log the response for debugging
+            logger.info(f"DEBUG - Response status code: {response.status_code}")
+            try:
+                logger.info(f"DEBUG - Response body: {json.dumps(response.json(), indent=2)}")
+            except:
+                logger.info(f"DEBUG - Response body: {response.text}")
+                
             response.raise_for_status()
             
             # Return the response
             return response.json()
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error adding posts to news service: {e}")
+            logger.error(f"Error sending post to news service: {e}")
             return None
         except Exception as e:
-            logger.error(f"Unexpected error adding post to news service: {e}")
+            logger.error(f"Unexpected error in add_post: {e}")
             return None
 
     def get_news(self, endpoint: str):

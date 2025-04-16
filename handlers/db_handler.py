@@ -28,9 +28,10 @@ class DatabaseHandler:
                     title TEXT NOT NULL,
                     desc TEXT NOT NULL,
                     image_url TEXT,
-                    english_summary TEXT,
-                    ukrainian_title TEXT,
-                    ukrainian_summary TEXT,
+                    en_title TEXT,
+                    en_text TEXT,
+                    uk_title TEXT,
+                    uk_text TEXT,
                     created_at TIMESTAMP NOT NULL,
                     source TEXT NOT NULL,
                     status TEXT NOT NULL DEFAULT 'queued',
@@ -82,17 +83,18 @@ class DatabaseHandler:
                     cursor.execute('''
                         INSERT INTO posts (
                             url, title, desc, image_url, 
-                            english_summary, ukrainian_title, ukrainian_summary,
+                            en_title, en_text, uk_title, uk_text,
                             created_at, source, status, full_text
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (
                         post.url,
                         post.title,
                         post.desc,
                         post.image_url,
-                        post.english_summary,
-                        post.ukrainian_title,
-                        post.ukrainian_summary,
+                        post.en_title,
+                        post.en_text,
+                        post.uk_title,
+                        post.uk_text,
                         post.created_at or datetime.now(),
                         source,  # Store the source
                         getattr(post, 'status', 'queued'),  # Get status from post or default to 'queued'
@@ -127,7 +129,7 @@ class DatabaseHandler:
                 
                 query = '''
                     SELECT url, title, desc, image_url, 
-                           english_summary, ukrainian_title, ukrainian_summary,
+                           en_title, en_text, uk_title, uk_text,
                            created_at, source, status, full_text
                     FROM posts 
                 '''
@@ -158,15 +160,16 @@ class DatabaseHandler:
                         title=row[1],
                         desc=row[2],
                         image_url=row[3],
-                        english_summary=row[4],
-                        ukrainian_title=row[5],
-                        ukrainian_summary=row[6],
-                        created_at=datetime.fromisoformat(row[7])
+                        en_title=row[4],
+                        en_text=row[5],
+                        uk_title=row[6],
+                        uk_text=row[7],
+                        created_at=datetime.fromisoformat(row[8])
                     )
                     # Set source, status, and full text
-                    post.source = row[8]
-                    post.status = row[9]
-                    post.full_text = row[10]
+                    post.source = row[9]
+                    post.status = row[10]
+                    post.full_text = row[11]
                     posts.append(post)
                 return posts
                 
@@ -189,7 +192,7 @@ class DatabaseHandler:
                 cursor = conn.cursor()
                 cursor.execute('''
                     SELECT url, title, desc, image_url, 
-                           english_summary, ukrainian_title, ukrainian_summary,
+                           en_title, en_text, uk_title, uk_text,
                            created_at, source, status
                     FROM posts 
                     WHERE url = ?
@@ -202,14 +205,15 @@ class DatabaseHandler:
                         title=row[1],
                         desc=row[2],
                         image_url=row[3],
-                        english_summary=row[4],
-                        ukrainian_title=row[5],
-                        ukrainian_summary=row[6],
-                        created_at=datetime.fromisoformat(row[7])
+                        en_title=row[4],
+                        en_text=row[5],
+                        uk_title=row[6],
+                        uk_text=row[7],
+                        created_at=datetime.fromisoformat(row[8])
                     )
                     # Store the source and status as attributes
-                    post.source = row[8]
-                    post.status = row[9]
+                    post.source = row[9]
+                    post.status = row[10]
                     return post
                 return None
                 
@@ -233,17 +237,17 @@ class DatabaseHandler:
                 cursor.execute('''
                     UPDATE posts 
                     SET title = ?, desc = ?, image_url = ?,
-                        english_summary = ?, ukrainian_title = ?, 
-                        ukrainian_summary = ?, created_at = ?, status = ?,
-                        full_text = ?
+                        en_title = ?, en_text = ?, uk_title = ?, uk_text = ?,
+                        created_at = ?, status = ?, full_text = ?
                     WHERE url = ?
                 ''', (
                     post.title,
                     post.desc,
                     post.image_url,
-                    post.english_summary,
-                    post.ukrainian_title,
-                    post.ukrainian_summary,
+                    post.en_title,
+                    post.en_text,
+                    post.uk_title,
+                    post.uk_text,
                     post.created_at or datetime.now(),
                     getattr(post, 'status', 'queued'),  # Get status attribute or default to 'queued'
                     getattr(post, 'full_text', ''),  # Get full text attribute or default to empty string

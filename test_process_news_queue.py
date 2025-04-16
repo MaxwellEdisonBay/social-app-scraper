@@ -22,7 +22,6 @@ logger = logging.getLogger("test_process_news_queue")
 
 def create_test_posts():
     """Create test posts with various topics"""
-    # Generate a unique timestamp for each run
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     
     return [
@@ -32,7 +31,10 @@ def create_test_posts():
             desc=f"Canada has announced a new package of military aid for Ukraine, including armored vehicles and ammunition. This is test {timestamp}.",
             image_url=f"https://example.com/ukraine1_{timestamp}.jpg",
             created_at=datetime.now(),
-            source="test"
+            source="test",
+            uk_title=f"Україна отримує нову військову допомогу від Канади - {timestamp}",
+            en_text=f"Canada has announced a new package of military aid for Ukraine, including armored vehicles and ammunition. This is test {timestamp}.",
+            uk_text=f"Канада оголосила про новий пакет військової допомоги для України, включаючи бронетранспортери та боєприпаси. Це тест {timestamp}."
         ),
         Post(
             url=f"https://example.com/ukraine2_{timestamp}",
@@ -40,7 +42,10 @@ def create_test_posts():
             desc=f"A new program helps Ukrainian refugees settle in Toronto, providing housing and job assistance. This is test {timestamp}.",
             image_url=f"https://example.com/ukraine2_{timestamp}.jpg",
             created_at=datetime.now(),
-            source="test"
+            source="test",
+            uk_title=f"Українські біженці знаходять нові домівки в Торонто - {timestamp}",
+            en_text=f"A new program helps Ukrainian refugees settle in Toronto, providing housing and job assistance. This is test {timestamp}.",
+            uk_text=f"Нова програма допомагає українським біженцям оселитися в Торонто, надаючи житло та допомогу з працевлаштуванням. Це тест {timestamp}."
         ),
         Post(
             url=f"https://example.com/sports_{timestamp}",
@@ -48,7 +53,10 @@ def create_test_posts():
             desc=f"The local hockey team has won the championship after a thrilling final match. This is test {timestamp}.",
             image_url=f"https://example.com/sports_{timestamp}.jpg",
             created_at=datetime.now(),
-            source="test"
+            source="test",
+            uk_title=f"Місцева спортивна команда виграє чемпіонат - {timestamp}",
+            en_text=f"The local hockey team has won the championship after a thrilling final match. This is test {timestamp}.",
+            uk_text=f"Місцева хокейна команда виграла чемпіонат після захоплюючого фінального матчу. Це тест {timestamp}."
         ),
         Post(
             url=f"https://example.com/weather_{timestamp}",
@@ -56,7 +64,10 @@ def create_test_posts():
             desc=f"Sunny weather expected for the weekend with temperatures reaching 25°C. This is test {timestamp}.",
             image_url=f"https://example.com/weather_{timestamp}.jpg",
             created_at=datetime.now(),
-            source="test"
+            source="test",
+            uk_title=f"Прогноз погоди на вихідні - {timestamp}",
+            en_text=f"Sunny weather expected for the weekend with temperatures reaching 25°C. This is test {timestamp}.",
+            uk_text=f"На вихідних очікується сонячна погода з температурою до 25°C. Це тест {timestamp}."
         ),
         Post(
             url=f"https://example.com/immigration_{timestamp}",
@@ -64,7 +75,10 @@ def create_test_posts():
             desc=f"The government has announced new immigration policies that will affect Ukrainian refugees. This is test {timestamp}.",
             image_url=f"https://example.com/immigration_{timestamp}.jpg",
             created_at=datetime.now(),
-            source="test"
+            source="test",
+            uk_title=f"Оголошено нові іміграційні правила - {timestamp}",
+            en_text=f"The government has announced new immigration policies that will affect Ukrainian refugees. This is test {timestamp}.",
+            uk_text=f"Уряд оголосив про нові іміграційні правила, які вплинуть на українських біженців. Це тест {timestamp}."
         )
     ]
 
