@@ -21,7 +21,6 @@ class NewsQueue:
     def add_news(self, posts: List[Post], source: str) -> List[Post]:
         """
         Add new posts to the queue and cache them.
-        Checks for semantic similarity with posts from the last day in the backlog.
         
         Args:
             posts (List[Post]): List of posts to add
@@ -33,15 +32,9 @@ class NewsQueue:
         if not posts:
             return []
             
-        # Get posts from the last day in the backlog for similarity checking
-        recent_backlog = self.db_handler.get_recent_posts(days=1, status='processed')
-        
-        # Filter for semantic similarity
-        unique_posts = filter_similar_posts(posts, recent_backlog, threshold=0.85)
-        
         # Process and add each post
         added_posts = []
-        for post in unique_posts:
+        for post in posts:
             # Skip if post already exists
             if self.db_handler.get_post_by_url(post.url):
                 continue
@@ -133,7 +126,7 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Warning: Could not clear database: {e}\n")
         
-        queue = NewsQueue(max_posts=100)  # Skip ML processing for testing
+        queue = NewsQueue(max_posts=1000)  # Set to 1000 posts
         
         # Test data
         test_posts = [

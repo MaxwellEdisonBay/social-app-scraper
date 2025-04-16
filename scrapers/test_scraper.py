@@ -12,7 +12,7 @@ class TestScraper(BaseScraper):
     Useful for testing the news queue functionality.
     """
     
-    def __init__(self, db_handler=None, max_posts=100):
+    def __init__(self, db_handler=None, max_posts=1000):
         """
         Initialize the test scraper.
         

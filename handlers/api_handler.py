@@ -56,18 +56,66 @@ class APIHandler:
         if not post.url:
             raise ValueError("Post URL is required")
             
+        # Extract plain text from rich text if available
+        en_text_plain = None
+        uk_text_plain = None
+        
+        if hasattr(post, 'en_text') and post.en_text:
+            # If en_text contains HTML, extract plain text
+            if '<' in post.en_text and '>' in post.en_text:
+                # Simple HTML stripping - in production you might want to use a proper HTML parser
+                en_text_plain = post.en_text.replace('<h1>', '').replace('</h1>', '\n')
+                en_text_plain = en_text_plain.replace('<h2>', '').replace('</h2>', '\n')
+                en_text_plain = en_text_plain.replace('<h3>', '').replace('</h3>', '\n')
+                en_text_plain = en_text_plain.replace('<p>', '').replace('</p>', '\n')
+                en_text_plain = en_text_plain.replace('<bold>', '').replace('</bold>', '')
+                en_text_plain = en_text_plain.replace('<italic>', '').replace('</italic>', '')
+                en_text_plain = en_text_plain.replace('<ul>', '').replace('</ul>', '\n')
+                en_text_plain = en_text_plain.replace('<li>', '- ').replace('</li>', '\n')
+                en_text_plain = en_text_plain.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n')
+                # Remove any remaining HTML tags
+                import re
+                en_text_plain = re.sub(r'<[^>]+>', '', en_text_plain)
+                # Clean up multiple newlines
+                en_text_plain = re.sub(r'\n\s*\n', '\n\n', en_text_plain)
+            else:
+                # If no HTML, use as is
+                en_text_plain = post.en_text
+        
+        if hasattr(post, 'uk_text') and post.uk_text:
+            # If uk_text contains HTML, extract plain text
+            if '<' in post.uk_text and '>' in post.uk_text:
+                # Simple HTML stripping - in production you might want to use a proper HTML parser
+                uk_text_plain = post.uk_text.replace('<h1>', '').replace('</h1>', '\n')
+                uk_text_plain = uk_text_plain.replace('<h2>', '').replace('</h2>', '\n')
+                uk_text_plain = uk_text_plain.replace('<h3>', '').replace('</h3>', '\n')
+                uk_text_plain = uk_text_plain.replace('<p>', '').replace('</p>', '\n')
+                uk_text_plain = uk_text_plain.replace('<bold>', '').replace('</bold>', '')
+                uk_text_plain = uk_text_plain.replace('<italic>', '').replace('</italic>', '')
+                uk_text_plain = uk_text_plain.replace('<ul>', '').replace('</ul>', '\n')
+                uk_text_plain = uk_text_plain.replace('<li>', '- ').replace('</li>', '\n')
+                uk_text_plain = uk_text_plain.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n')
+                # Remove any remaining HTML tags
+                import re
+                uk_text_plain = re.sub(r'<[^>]+>', '', uk_text_plain)
+                # Clean up multiple newlines
+                uk_text_plain = re.sub(r'\n\s*\n', '\n\n', uk_text_plain)
+            else:
+                # If no HTML, use as is
+                uk_text_plain = post.uk_text
+            
         # Map the post to API format
         api_post = {
-            'text': post.en_text if hasattr(post, 'en_text') else None,
+            'text': en_text_plain,  # Plain text version
             'type': 'news',
             'author': self.author_id,  # Use author_id from .env
             'children': [],  # Empty array for news posts
-            'richText': post.en_text if hasattr(post, 'en_text') else None,
-            'textUk': post.uk_text if hasattr(post, 'uk_text') else None,
-            'richTextUk': post.uk_text if hasattr(post, 'uk_text') else None,
+            'richText': post.en_text if hasattr(post, 'en_text') else None,  # HTML version
+            'textUk': uk_text_plain,  # Plain text version
+            'richTextUk': post.uk_text if hasattr(post, 'uk_text') else None,  # HTML version
             'title': post.en_title if hasattr(post, 'en_title') else None,
             'titleUk': post.uk_title if hasattr(post, 'uk_title') else None,
-            'mediaUrls': [post.image_url] if post.image_url else [],
+            'mediaUrls': [],  # Empty array by default, will be populated after successful image upload
             'newsOriginalUrl': post.url,
             'newsSource': post.source if hasattr(post, 'source') else None
         }
@@ -143,14 +191,14 @@ class APIHandler:
             logger.info(f"DEBUG - API URL: {self.base_url}/en/api/news")
             logger.info(f"DEBUG - API Key: {self.api_key[:5]}... (truncated)")
             logger.info(f"DEBUG - Author ID: {self.author_id}")
-            logger.info(f"DEBUG - Request payload: {json.dumps(api_post, indent=2)}")
+            logger.info(f"DEBUG - Request payload: {json.dumps({'posts': [api_post]}, indent=2)}")
             
             # Send the post to the news service
             logger.info(f"Sending post to news service: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
             response = requests.post(
                 f"{self.base_url}/en/api/news",
                 params={"apiKey": self.api_key},
-                json=api_post,
+                json={"posts": [api_post]},  # Wrap the post in a posts array
                 headers=self.headers,
                 verify=self.verify_ssl,
                 timeout=30

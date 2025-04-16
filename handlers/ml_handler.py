@@ -1,5 +1,4 @@
 import os
-from sentence_transformers import SentenceTransformer, util
 import sys
 from pathlib import Path
 import google.generativeai as genai
@@ -15,49 +14,18 @@ import json
 
 def filter_similar_posts(new_posts: list[Post], existing_posts: list[Post], threshold: float = 0.95) -> list[Post]:
     """
-    Filter out posts that are too similar to existing posts.
+    This function is now a placeholder that returns all new posts.
+    The similarity filtering has been removed to reduce dependencies.
     
     Args:
         new_posts (list[Post]): List of new posts to check
         existing_posts (list[Post]): List of existing posts to compare against
-        threshold (float): Similarity threshold (0.0 to 1.0). Higher means more strict.
-                         Default is 0.95 (95% similarity)
+        threshold (float): Similarity threshold (not used anymore)
     
     Returns:
-        list[Post]: List of posts that are sufficiently different from existing posts
+        list[Post]: List of all new posts
     """
-    if len(existing_posts) == 0:
-        return new_posts
-
-    model = SentenceTransformer('all-MiniLM-L6-v2')
-
-    # Combine title and description for each post
-    existing_texts = [f"{post.title}. {post.desc}" for post in existing_posts]
-    existing_embeddings = model.encode(existing_texts, convert_to_tensor=True)
-
-    filtered_posts = [] 
-    for post in new_posts:
-        # Combine title and description for new post
-        post_text = f"{post.title}. {post.desc}"
-        post_embedding = model.encode(post_text, convert_to_tensor=True)
-
-        # Calculate similarities with existing posts
-        similarities = util.pytorch_cos_sim(post_embedding, existing_embeddings)
-        max_similarity = similarities.max().item()
-
-        # Debug logging
-        print(f"\nAnalyzing post: {post.title}")
-        print(f"Max similarity: {max_similarity:.3f}")
-        print(f"Most similar existing post: {existing_posts[similarities.argmax().item()].title}")
-
-        # If the post is sufficiently different from all existing posts, keep it
-        if max_similarity < threshold:
-            print("-> Post is unique enough, keeping it")
-            filtered_posts.append(post)
-        else:
-            print("-> Post is too similar, filtering it out")
-
-    return filtered_posts
+    return new_posts
 
 
 def mock_get_relevant_posts(posts: List[Post], api_key: str = None) -> List[str]:
@@ -250,15 +218,16 @@ def get_article_translation(api_key: str, title: str, text: str) -> tuple[str, s
 IMPORTANT: Format both the English and Ukrainian text with rich text tags. Use the following tags:
 - <h1> for main headings
 - <h2> for subheadings
+- <h3> for sub-subheadings
 - <p> for paragraphs
-- <bold> for important information
-- <italic> for emphasis
-- <strikethrough> for outdated information
+- <b> for important information
+- <i> for emphasis
+- <s> for outdated information
 - <ol> and <li> for numbered lists
 - <ul> and <li> for bullet lists
-- <quote> for direct quotes
+- <blockquote> for direct quotes
 - <code> for technical terms or data
-- <link> for hyperlinks (include the URL in the tag)
+- <a> for hyperlinks (include the URL in the tag)
 
 Please format the response as JSON with these keys:
 - uk_title: Ukrainian translation of the title

@@ -111,32 +111,51 @@ class TelegramHandler:
         DESC_LIMIT = 200
         SUMMARY_LIMIT = 500
         
-        # Helper function to truncate text
-        def truncate(text, limit):
+        # Helper function to truncate text and convert HTML to plain text
+        def truncate_and_clean(text, limit):
             if not text:
                 return ""
+            # Convert HTML to plain text
+            if '<' in text and '>' in text:
+                # Replace HTML tags with appropriate plain text
+                text = text.replace('<h1>', '').replace('</h1>', '\n')
+                text = text.replace('<h2>', '').replace('</h2>', '\n')
+                text = text.replace('<h3>', '').replace('</h3>', '\n')
+                text = text.replace('<p>', '').replace('</p>', '\n')
+                text = text.replace('<b>', '').replace('</b>', '')
+                text = text.replace('<i>', '').replace('</i>', '')
+                text = text.replace('<ul>', '').replace('</ul>', '\n')
+                text = text.replace('<li>', '- ').replace('</li>', '\n')
+                text = text.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n')
+                # Remove any remaining HTML tags
+                import re
+                text = re.sub(r'<[^>]+>', '', text)
+                # Clean up multiple newlines
+                text = re.sub(r'\n\s*\n', '\n\n', text)
+            
+            # Truncate after cleaning
             if len(text) <= limit:
                 return text
             return text[:limit] + "..."
         
         # Start with the title
-        message = f"<b>{truncate(post.title, TITLE_LIMIT)}</b>\n\n"
+        message = f"<b>{truncate_and_clean(post.title, TITLE_LIMIT)}</b>\n\n"
         
         # Add Ukrainian title if available
         if post.uk_title:
-            message += f"<b>Українською:</b> {truncate(post.uk_title, TITLE_LIMIT)}\n\n"
+            message += f"<b>Українською:</b> {truncate_and_clean(post.uk_title, TITLE_LIMIT)}\n\n"
             
         # Add description
         if post.desc:
-            message += f"{truncate(post.desc, DESC_LIMIT)}\n\n"
+            message += f"{truncate_and_clean(post.desc, DESC_LIMIT)}\n\n"
             
         # Add English text if available
         if post.en_text:
-            message += f"<b>English Summary:</b>\n{truncate(post.en_text, SUMMARY_LIMIT)}\n\n"
+            message += f"<b>English Summary:</b>\n{truncate_and_clean(post.en_text, SUMMARY_LIMIT)}\n\n"
             
         # Add Ukrainian text if available
         if post.uk_text:
-            message += f"<b>Український переклад:</b>\n{truncate(post.uk_text, SUMMARY_LIMIT)}\n\n"
+            message += f"<b>Український переклад:</b>\n{truncate_and_clean(post.uk_text, SUMMARY_LIMIT)}\n\n"
             
         # Add source and link
         message += f"<b>Source:</b> {post.source}\n"

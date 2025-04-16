@@ -18,8 +18,8 @@ def test_news_queue_with_scraper():
     print("=== TESTING NEWS QUEUE WITH TEST SCRAPER ===")
     
     # Initialize components
-    db_handler = DatabaseHandler(max_posts=100)
-    news_queue = NewsQueue(max_posts=100)
+    db_handler = DatabaseHandler(max_posts=1000)
+    news_queue = NewsQueue(max_posts=1000)
     test_scraper = TestScraper(db_handler=db_handler)
     
     try:
