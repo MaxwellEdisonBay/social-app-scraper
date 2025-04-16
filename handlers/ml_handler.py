@@ -258,7 +258,7 @@ IMPORTANT: Format both the English and Ukrainian text with rich text tags. Use O
 - <a href="URL"> for hyperlinks (include the URL in the href attribute)
 
 Styling guidelines:
-1. Use <h1> for the main title of the article
+1. DO NOT include the article title in the text content - titles are handled separately
 2. Use <h2> for major section breaks
 3. Wrap all text content in <p> tags
 4. Use <strong> for key facts, statistics, or important statements
@@ -272,11 +272,12 @@ Styling guidelines:
 
 CRITICAL REQUIREMENTS:
 1. DO NOT return empty sections. Every section must have content.
-2. Ensure all paragraphs are properly wrapped in <p> tags.
-3. Make sure all lists have proper <ul> or <ol> tags with <li> items.
-4. Format quotes with <blockquote> tags.
-5. Ensure the Ukrainian translation is complete and accurate.
-6. Maintain the same structure and formatting in both English and Ukrainian versions.
+2. DO NOT include the article title in the text content - titles are handled separately.
+3. Ensure all paragraphs are properly wrapped in <p> tags.
+4. Make sure all lists have proper <ul> or <ol> tags with <li> items.
+5. Format quotes with <blockquote> tags.
+6. Ensure the Ukrainian translation is complete and accurate.
+7. Maintain the same structure and formatting in both English and Ukrainian versions.
 
 TRANSLATION GUIDELINES:
 1. DO NOT translate Canada-specific acronyms, program names, or official terms (e.g., Express Entry, IRCC, PNP, etc.)
@@ -289,8 +290,8 @@ TRANSLATION GUIDELINES:
 Please format the response as JSON with these keys:
 - uk_title: Ukrainian translation of the title
 - en_title: Improved English title
-- en_text: Improved English text with rich text formatting
-- uk_text: Ukrainian translation of the improved text with rich text formatting
+- en_text: Improved English text with rich text formatting (DO NOT include the title)
+- uk_text: Ukrainian translation of the improved text with rich text formatting (DO NOT include the title)
 
 Original title: {title}
 
