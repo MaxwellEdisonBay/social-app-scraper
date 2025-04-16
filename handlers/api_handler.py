@@ -25,6 +25,7 @@ class APIHandler:
         self.base_url = os.getenv("NEWS_SERVICE_BASE_URL", "")
         self.api_key = os.getenv("NEWS_SERVICE_API_KEY", "")
         self.author_id = os.getenv("NEWS_SERVICE_AUTHOR_ID", "")
+        self.organization_id = os.getenv("NEWS_SERVICE_ORGANIZATION_ID", "")
         self.verify_ssl = verify_ssl
         self.image_handler = ImageHandler()
         
@@ -109,6 +110,7 @@ class APIHandler:
             'text': en_text_plain,  # Plain text version
             'type': 'news',
             'author': self.author_id,  # Use author_id from .env
+            'authorOrg': self.organization_id,  # Use organization_id from .env
             'children': [],  # Empty array for news posts
             'richText': post.en_text if hasattr(post, 'en_text') else None,  # HTML version
             'textUk': uk_text_plain,  # Plain text version

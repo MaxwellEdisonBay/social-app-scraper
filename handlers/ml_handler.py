@@ -215,19 +215,31 @@ def get_article_translation(api_key: str, title: str, text: str) -> tuple[str, s
 4. Translate the improved text to Ukrainian
 5. Exclude all the personal information and any other generic information that is not relevant to the news
 
-IMPORTANT: Format both the English and Ukrainian text with rich text tags. Use the following tags:
-- <h1> for main headings
-- <h2> for subheadings
-- <h3> for sub-subheadings
+IMPORTANT: Format both the English and Ukrainian text with rich text tags. Use ONLY these supported tags:
+- <h1> for main article title or primary section headings
+- <h2> for secondary section headings
 - <p> for paragraphs
-- <b> for important information
-- <i> for emphasis
-- <s> for outdated information
+- <strong> for important information or emphasis (NOT <b>)
+- <em> for subtle emphasis or foreign terms (NOT <i>)
+- <s> for outdated or incorrect information
+- <ul> and <li> for bullet point lists
 - <ol> and <li> for numbered lists
-- <ul> and <li> for bullet lists
-- <blockquote> for direct quotes
-- <code> for technical terms or data
-- <a> for hyperlinks (include the URL in the tag)
+- <blockquote> for direct quotes or important statements
+- <code> for technical terms, data, or short code snippets
+- <a href="URL"> for hyperlinks (include the URL in the href attribute)
+
+Styling guidelines:
+1. Use <h1> for the main title of the article
+2. Use <h2> for major section breaks
+3. Wrap all text content in <p> tags
+4. Use <strong> for key facts, statistics, or important statements
+5. Use <em> for subtle emphasis or to highlight specific terms
+6. Use <s> to mark outdated information that has been corrected
+7. Use <ul> and <li> for unordered lists of related items
+8. Use <ol> and <li> for sequential steps or ranked items
+9. Use <blockquote> for direct quotes from sources
+10. Use <code> for technical terms, numbers, or data points
+11. Use <a> for linking to related sources or references
 
 Please format the response as JSON with these keys:
 - uk_title: Ukrainian translation of the title

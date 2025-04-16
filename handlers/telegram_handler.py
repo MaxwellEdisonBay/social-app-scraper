@@ -115,23 +115,12 @@ class TelegramHandler:
         def truncate_and_clean(text, limit):
             if not text:
                 return ""
-            # Convert HTML to plain text
-            if '<' in text and '>' in text:
-                # Replace HTML tags with appropriate plain text
-                text = text.replace('<h1>', '').replace('</h1>', '\n')
-                text = text.replace('<h2>', '').replace('</h2>', '\n')
-                text = text.replace('<h3>', '').replace('</h3>', '\n')
-                text = text.replace('<p>', '').replace('</p>', '\n')
-                text = text.replace('<b>', '').replace('</b>', '')
-                text = text.replace('<i>', '').replace('</i>', '')
-                text = text.replace('<ul>', '').replace('</ul>', '\n')
-                text = text.replace('<li>', '- ').replace('</li>', '\n')
-                text = text.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n')
-                # Remove any remaining HTML tags
-                import re
-                text = re.sub(r'<[^>]+>', '', text)
-                # Clean up multiple newlines
-                text = re.sub(r'\n\s*\n', '\n\n', text)
+            # Convert HTML to plain text using a simple regex
+            import re
+            text = re.sub('<[^<]+?>', '', text)
+            
+            # Clean up multiple newlines
+            text = re.sub(r'\n\s*\n', '\n\n', text)
             
             # Truncate after cleaning
             if len(text) <= limit:
