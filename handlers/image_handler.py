@@ -43,7 +43,7 @@ class ImageHandler:
             
         try:
             # Download the image with proper User-Agent
-            logger.info(f"Downloading image from {image_url}")
+            logger.info(f"Downloading image from URL")
             response = requests.get(
                 image_url,
                 stream=True,
@@ -73,7 +73,7 @@ class ImageHandler:
             if "localhost" in upload_url or "127.0.0.1" in upload_url:
                 upload_url = upload_url.replace("https://", "http://")
                 
-            logger.info(f"Uploading image to {upload_url}")
+            logger.info(f"Uploading image to service")
             upload_response = requests.post(
                 upload_url,
                 files=files,
@@ -89,10 +89,10 @@ class ImageHandler:
             # Get the URL of the uploaded image
             result = upload_response.json()
             if 'fileUrl' in result:
-                logger.info(f"Image uploaded successfully: {result['fileUrl']}")
+                logger.info(f"Image uploaded successfully")
                 return result['fileUrl']
             else:
-                logger.error(f"Unexpected response format: {result}")
+                logger.error(f"Unexpected response format")
                 return None
                 
         except requests.exceptions.RequestException as e:

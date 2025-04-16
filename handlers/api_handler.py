@@ -163,13 +163,6 @@ class APIHandler:
                 
             # Log post details (truncated for readability)
             logger.info(f"Processing post: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
-            logger.info(f"URL: {post.url}")
-            
-            # Log description or english text (whichever is available)
-            if post.desc:
-                logger.info(f"Description: {post.desc[:100]}{'...' if len(post.desc) > 100 else ''}")
-            else:
-                logger.info(f"Using English text as description: {post.en_text[:100]}{'...' if len(post.en_text) > 100 else ''}")
             
             # Upload image if available
             uploaded_image_url = None
@@ -177,7 +170,7 @@ class APIHandler:
                 logger.info(f"Uploading image for post: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
                 uploaded_image_url = self.image_handler.upload_image(post.image_url)
                 if uploaded_image_url:
-                    logger.info(f"Image uploaded successfully: {uploaded_image_url}")
+                    logger.info(f"Image uploaded successfully")
                 else:
                     logger.warning(f"Failed to upload image for post: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
             
@@ -189,40 +182,30 @@ class APIHandler:
                 api_post["mediaUrls"] = [uploaded_image_url]
             
             # Log the request details for debugging
-            logger.info(f"DEBUG - Request details for post: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
-            logger.info(f"DEBUG - API URL: {self.base_url}/en/api/news")
-            logger.info(f"DEBUG - API Key: {self.api_key[:5]}... (truncated)")
-            logger.info(f"DEBUG - Author ID: {self.author_id}")
-            logger.info(f"DEBUG - Request payload: {json.dumps({'posts': [api_post]}, indent=2)}")
+            logger.info(f"Sending post to news service: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
             
             # Send the post to the news service
-            logger.info(f"Sending post to news service: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
             response = requests.post(
                 f"{self.base_url}/en/api/news",
                 params={"apiKey": self.api_key},
-                json={"posts": [api_post]},  # Wrap the post in a posts array
                 headers=self.headers,
+                json={"posts": [api_post]},
                 verify=self.verify_ssl,
                 timeout=30
             )
             
-            # Log the response for debugging
-            logger.info(f"DEBUG - Response status code: {response.status_code}")
-            try:
-                logger.info(f"DEBUG - Response body: {json.dumps(response.json(), indent=2)}")
-            except:
-                logger.info(f"DEBUG - Response body: {response.text}")
+            # Check if the request was successful
+            if response.status_code == 200:
+                logger.info(f"Successfully sent post to news service: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
+                return response.json()
+            else:
+                logger.error(f"Failed to send post to news service: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
+                logger.error(f"Status code: {response.status_code}")
+                logger.error(f"Response: {response.text[:200]}{'...' if len(response.text) > 200 else ''}")
+                return None
                 
-            response.raise_for_status()
-            
-            # Return the response
-            return response.json()
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error sending post to news service: {e}")
-            return None
         except Exception as e:
-            logger.error(f"Unexpected error in add_post: {e}")
+            logger.error(f"Error sending post to news service: {e}")
             return None
 
     def get_news(self, endpoint: str):

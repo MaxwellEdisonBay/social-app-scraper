@@ -53,10 +53,10 @@ class TelegramHandler:
                 parse_mode=parse_mode,
                 reply_markup=reply_markup
             )
-            logger.info(f"Message sent to {chat_id}")
+            logger.info(f"Message sent to chat ID {chat_id}")
             return True
         except TelegramError as e:
-            logger.error(f"Error sending message to {chat_id}: {e}")
+            logger.error(f"Error sending message to chat ID {chat_id}: {e}")
             return False
         except Exception as e:
             logger.error(f"Error sending message: {e}")
