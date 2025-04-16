@@ -86,5 +86,62 @@ async def test_telegram_handler():
     
     logger.info("Test completed successfully")
 
+class TestPost:
+    """Simple class to simulate a post object"""
+    def __init__(self, uk_title, uk_text, url, image_url=None):
+        self.uk_title = uk_title
+        self.uk_text = uk_text
+        self.url = url
+        self.image_url = image_url
+
+async def test_telegram_bot():
+    """Test the Telegram bot functionality"""
+    # Initialize the handler
+    handler = TelegramHandler()
+    
+    if not handler.enabled:
+        print("Telegram bot is not enabled. Please check your TELEGRAM_BOT_TOKEN in .env file")
+        return
+    
+    # Create test posts
+    test_posts = [
+        # Post with image
+        TestPost(
+            uk_title="Історія України",
+            uk_text="Україна має багату та різноманітну історію, що сягає тисячоліть. Від Київської Русі до сучасної незалежної держави, "
+                   "український народ пройшов довгий шлях боротьби за свободу та незалежність. Культурна спадщина України включає "
+                   "унікальні традиції, мистецтво, літературу та архітектуру.",
+            url="https://uk.wikipedia.org/wiki/Україна",
+            image_url="https://i.imgur.com/dZAz8Fk.jpg"
+        ),
+        # Post without image but with rich preview
+        TestPost(
+            uk_title="Київ - столиця України",
+            uk_text="Київ - одне з найстаріших міст Європи, столиця України, важливий культурний, науковий та промисловий центр. "
+                   "Місто відоме своїми золотоверхими церквами, древніми монастирями та багатою історичною спадщиною. "
+                   "Сучасний Київ - це динамічний мегаполіс, що стрімко розвивається.",
+            url="https://uk.wikipedia.org/wiki/Київ"
+        )
+    ]
+    
+    # Get admin channels
+    admin_channels = await handler.get_admin_channels()
+    print(f"Found {len(admin_channels)} admin channels")
+    
+    if not admin_channels:
+        print("No admin channels found. Please add the bot as an admin to at least one channel.")
+        return
+    
+    # Test broadcasting posts
+    for i, post in enumerate(test_posts, 1):
+        print(f"\nTesting post {i}:")
+        print(f"Title: {post.uk_title}")
+        print(f"Has image: {'Yes' if post.image_url else 'No'}")
+        print(f"URL: {post.url}")
+        
+        success_count = await handler.broadcast_post(post)
+        print(f"Successfully sent to {success_count} channels")
+
 if __name__ == "__main__":
-    asyncio.run(test_telegram_handler()) 
+    # Run the test
+    asyncio.run(test_telegram_bot()) 

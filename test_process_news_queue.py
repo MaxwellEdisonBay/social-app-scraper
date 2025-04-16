@@ -142,9 +142,36 @@ def test_process_news_queue():
                                 post.english_summary = f"This is an improved English summary of the article: {post.title}"
                                 post.ukrainian_summary = f"Це покращений український переклад статті: {post.title}"
                                 
-                                # Update the post in the database with translations
+                                # Mock API response for testing
+                                mock_api_result = {
+                                    'posts': [
+                                        {
+                                            '_id': f"test_id_{timestamp}",
+                                            'title': post.title,
+                                            'slug': f"test-slug-{timestamp}"
+                                        }
+                                    ]
+                                }
+                                
+                                # Update the post's URL with the news service URL
+                                if isinstance(mock_api_result, dict) and 'posts' in mock_api_result and len(mock_api_result['posts']) > 0:
+                                    # Get the post data from the API response
+                                    post_data = mock_api_result['posts'][0]
+                                    
+                                    # Try to get the slug or _id from the response
+                                    post_id = post_data.get('slug') or post_data.get('_id')
+                                    
+                                    if post_id:
+                                        # Construct the URL using a mock NEWS_SERVICE_BASE_URL
+                                        news_service_url = f"http://example.com/uk/news/{post_id}"
+                                        post.url = news_service_url
+                                        logger.info(f"Updated post URL to news service URL: {news_service_url}")
+                                    else:
+                                        logger.warning(f"Could not find slug or _id in API response for post: {post.title}")
+                                
+                                # Update the post in the database with translations and new URL
                                 news_queue.db_handler.update_post(post)
-                                logger.info(f"Updated post in database with translations: {post.title}")
+                                logger.info(f"Updated post in database with translations and new URL: {post.title}")
                             else:
                                 logger.warning(f"Failed to fetch full text for {post.title}")
                         except Exception as e:

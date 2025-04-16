@@ -159,16 +159,32 @@ async def process_news_queue():
                                 
                             news_queue.db_handler.update_post(post)
                             
-                            # Send to Telegram subscribers
-                            logger.info(f"Sending post to Telegram subscribers: {post.title}")
-                            sent_count = await telegram_handler.broadcast_post(post, source=post.source)
-                            logger.info(f"Broadcasted post to {sent_count} subscribers")
-                            
-                            # Send to news service API
+                            # Send to news service API first
                             logger.info(f"Sending post to news service: {post.title}")
                             api_result = api_handler.add_post(post)
                             if api_result:
                                 logger.info(f"Successfully sent post to news service: {post.title}")
+                                # Get the news service URL from the API response
+                                if isinstance(api_result, dict) and 'insertedPosts' in api_result and len(api_result['insertedPosts']) > 0:
+                                    # Get the post data from the API response
+                                    post_data = api_result['insertedPosts'][0]
+                                    
+                                    # Try to get the slug or _id from the response
+                                    post_id = post_data.get('_id') or post_data.get('slug')
+                                    
+                                    if post_id:
+                                        # Construct the URL using the NEWS_SERVICE_BASE_URL
+                                        news_service_url = f"{api_handler.base_url}/uk/news/{post_id}"
+                                        logger.info(f"Generated news service URL: {news_service_url}")
+                                        
+                                        # Send to Telegram subscribers with the news service URL
+                                        logger.info(f"Sending post to Telegram subscribers: {post.title}")
+                                        sent_count = await telegram_handler.broadcast_post(post, source=post.source, override_url=news_service_url)
+                                        logger.info(f"Broadcasted post to {sent_count} subscribers")
+                                    else:
+                                        logger.warning(f"Could not find _id or slug in API response for post: {post.title}")
+                                else:
+                                    logger.warning(f"Unexpected API response format for post: {post.title}")
                             else:
                                 logger.error(f"Failed to send post to news service: {post.title}")
                         else:

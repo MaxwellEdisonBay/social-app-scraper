@@ -213,7 +213,14 @@ class APIHandler:
             # Check if the request was successful
             if response.status_code == 200:
                 logger.info(f"Successfully sent post to news service: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
-                return response.json()
+                response_data = response.json()
+                
+                # Check if the response has the expected format
+                if isinstance(response_data, dict) and 'message' in response_data and response_data['message'] == "Success" and 'insertedPosts' in response_data:
+                    return response_data
+                else:
+                    logger.warning(f"Unexpected response format from news service: {response_data}")
+                    return None
             else:
                 logger.error(f"Failed to send post to news service: {post.title[:50]}{'...' if len(post.title) > 50 else ''}")
                 logger.error(f"Status code: {response.status_code}")

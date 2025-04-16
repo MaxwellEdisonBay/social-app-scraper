@@ -34,31 +34,104 @@ class BBCScraper(BaseScraper):
                                              recursive=True)  # find all the promo divs that contain articles.
 
             for element in article_elements:
-                # Try to find a regular image first
-                image_el = element.find("img")
+                print("\nProcessing article element...")
                 
-                # If no regular image, look for a video preview image
-                if not image_el or not image_el.get("src"):
-                    image_el = element.find("img", class_="holding_image")
+                # Initialize image_el as None
+                image_el = None
+                
+                # First try to find image in the card media wrapper
+                media_wrapper = element.find("div", {"data-testid": "card-media"})
+                if media_wrapper:
+                    print("Found card media wrapper")
+                    # Look for all img tags within the media wrapper
+                    for img in media_wrapper.find_all("img"):
+                        # Skip placeholder images
+                        if "placeholder" in img.get("src", "").lower():
+                            continue
+                        # Check if this img has a srcset
+                        if img.get("srcset"):
+                            image_el = img
+                            break
+                        # If no srcset but has a valid src, use this img
+                        elif img.get("src") and "placeholder" not in img.get("src", "").lower():
+                            image_el = img
+                            break
+                
+                # If still no image, look for video preview
+                if not image_el:
+                    print("Looking for video card image...")
+                    video_card = element.find("div", {"data-testid": "dundee-video"})
+                    if video_card:
+                        print("Found video card")
+                        # Look for image in the video card's media wrapper
+                        media_wrapper = video_card.find("div", {"data-testid": "card-media"})
+                        if media_wrapper:
+                            # Look for all img tags within the media wrapper
+                            for img in media_wrapper.find_all("img"):
+                                # Skip placeholder images
+                                if "placeholder" in img.get("src", "").lower():
+                                    continue
+                                # Check if this img has a srcset
+                                if img.get("srcset"):
+                                    image_el = img
+                                    break
+                                # If no srcset but has a valid src, use this img
+                                elif img.get("src") and "placeholder" not in img.get("src", "").lower():
+                                    image_el = img
+                                    break
                 
                 link_el = element.find("a")
-                title_el = element.find("h2") 
-                desc_el = element.find("p")
+                title_el = element.find("h2", {"data-testid": "card-headline"})
+                desc_el = element.find("p", {"data-testid": "card-description"})
                 
-                # Check if we have a valid link and either a regular image or video preview
-                if link_el and link_el.get("href") and (image_el and image_el.get("src")):
+                # Check if we have a valid link and image
+                if link_el and link_el.get("href") and image_el:
                     # Get the image URL
-                    image_url = image_el.get("src")
+                    image_url = None
+                    
+                    # First try to get the highest quality image from srcset
+                    srcset = image_el.get("srcset", "")
+                    if srcset:
+                        try:
+                            print(f"Processing srcset: {srcset}")
+                            # Split srcset into individual URLs and find the highest resolution
+                            # Format: "url1 size1w, url2 size2w, ..."
+                            srcset_parts = [part.strip().split(" ") for part in srcset.split(",")]
+                            print(f"Srcset parts: {srcset_parts}")
+                            # Filter out any malformed entries and extract width numbers
+                            valid_parts = [(url, int(size.replace("w", ""))) 
+                                         for url, size in srcset_parts 
+                                         if url and size.endswith("w")]
+                            print(f"Valid parts: {valid_parts}")
+                            if valid_parts:
+                                # Sort by width and get the URL with the highest width
+                                image_url = max(valid_parts, key=lambda x: x[1])[0]
+                                print(f"Selected highest quality image: {image_url}")
+                        except (ValueError, IndexError) as e:
+                            print(f"Error parsing srcset: {e}")
+                    
+                    # If no valid srcset or couldn't parse it, fall back to src
+                    if not image_url:
+                        print("Falling back to src attribute")
+                        image_url = image_el.get("src")
+                        
+                        # Skip placeholder images
+                        if "placeholder" in image_url.lower():
+                            print("Skipping placeholder image")
+                            continue
                     
                     # If the image URL is relative, make it absolute
-                    if not image_url.startswith('http'):
+                    if image_url and not image_url.startswith('http'):
                         image_url = base_url + image_url
+                        print(f"Made image URL absolute: {image_url}")
+                    
+                    print(f"Final image URL: {image_url}")
                     
                     articles.append(
                         Post(
                             url=base_url + link_el.get("href"),
-                            title=title_el.text if title_el else "No title available",
-                            desc=desc_el.text if desc_el else "No description available",
+                            title=title_el.text.strip() if title_el else "No title available",
+                            desc=desc_el.text.strip() if desc_el else "No description available",
                             image_url=image_url,
                             created_at=datetime.now(),
                             source='bbc'
