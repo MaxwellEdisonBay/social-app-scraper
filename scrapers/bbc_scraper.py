@@ -65,13 +65,6 @@ class BBCScraper(BaseScraper):
                         source='bbc'
                     )
                     
-                    # Fetch the full text and image URL
-                    text_content, image_url = self.fetch_post_full_text(article_url)
-                    
-                    # Update the post with the image URL if available
-                    if image_url:
-                        post.image_url = image_url
-                    
                     articles.append(post)
             
             return articles
