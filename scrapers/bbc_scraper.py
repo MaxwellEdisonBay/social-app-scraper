@@ -15,6 +15,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 from common.models.models import Post
 from scrapers.base_scraper import BaseScraper
 
+def get_shadow_root(driver, element):
+        return driver.execute_script('return arguments[0].shadowRoot', element)
 
 class BBCScraper(BaseScraper):
     def __init__(self, enable_caching: bool = True, max_posts: int = 1000):
@@ -199,34 +201,20 @@ class BBCScraper(BaseScraper):
                     
                     # Try to find the video image
                     try:
-                        # Try multiple selectors for the video thumbnail
-                        image_selectors = [
-                            'div[data-testid="video-page-player"] img',  # Player image
-                            'div.video-player img',  # Alternative player image
-                            'img[data-testid="video-thumbnail"]',  # Explicit thumbnail
-                            'img.video-thumbnail',  # Class-based thumbnail
-                            'img.holding_image',  # Holding image
-                            'img[src*="ichef.bbci.co.uk"]'  # Any BBC image
-                        ]
-                        
-                        for selector in image_selectors:
-                            try:
-                                elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                                for element in elements:
-                                    src = element.get_attribute('src')
-                                    if src and "placeholder" not in src.lower() and "icon" not in src.lower():
-                                        # Process the src URL to get the highest quality image
-                                        if '$recipe' in src and '$width' in src:
-                                            processed_url = src.replace('$recipe', '976x549').replace('$width', '976')
-                                            image_url = processed_url
-                                        else:
-                                            image_url = src
-                                        print(f"Found video image using selector {selector}: {image_url}")
-                                        break
-                                if image_url:
-                                    break
-                            except:
-                                continue
+                        player_el = driver.find_element(By.ID, "toucan-bbcMediaPlayer0")
+                        player_root = get_shadow_root(driver, player_el)
+                        preplay_el = player_root.find_element(By.CSS_SELECTOR, 'smp-preplay-layout')
+                        preplay_root = get_shadow_root(driver, preplay_el)
+                        holding_image_el = preplay_root.find_element(By.CSS_SELECTOR, 'smp-holding-image')
+                        holding_image_root = get_shadow_root(driver, holding_image_el)
+                        img_el = holding_image_root.find_element(By.CSS_SELECTOR, 'img')
+                        image_src_set = img_el.get_attribute('srcset')
+                        if image_src_set:
+                            image_url = self._get_largest_image_src(image_src_set)
+                            if image_url:
+                                print(f"Found video image with srcset: {image_url}")
+                        else:
+                            print("No image srcset found")
                     except Exception as e:
                         print(f"Error finding video image: {e}")
                     
