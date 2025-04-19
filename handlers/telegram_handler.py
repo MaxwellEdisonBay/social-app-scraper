@@ -161,12 +161,9 @@ class TelegramHandler:
             return False
             
         try:
-            # Clean HTML from text
-            cleaned_text = self._clean_html(text)
-            
             await self.bot.send_message(
                 chat_id=chat_id,
-                text=cleaned_text,
+                text=text,
                 parse_mode=parse_mode,
                 reply_markup=reply_markup
             )
@@ -287,15 +284,24 @@ class TelegramHandler:
                 return text
             return text[:limit] + "..."
         
-        # Format the message according to requirements
-        # Use the full Ukrainian title without truncation
-        message = f"<b>{post.uk_title}</b>\n\n"
+        # Clean HTML from title and text separately
+        # For title, preserve formatting but clean other HTML
+        clean_title = self._clean_html(post.uk_title)
+        # For text, remove all HTML
+        clean_text = self._clean_html(post.uk_text) if post.uk_text else ""
         
-        # Add Ukrainian text
-        if post.uk_text:
-            message += f"{truncate_text(post.uk_text, TEXT_LIMIT)}\n\n"
+        # Format the message with proper HTML tags
+        # Make sure the title is wrapped in <b> tags
+        if not clean_title.startswith('<b>'):
+            clean_title = f"<b>{clean_title}</b>"
+        
+        message = f"{clean_title}\n\n"
+        
+        # Add Ukrainian text if available
+        if clean_text:
+            message += f"{truncate_text(clean_text, TEXT_LIMIT)}\n\n"
             
         # Add link for preview (will be hidden by the button)
-        message += f"<a href='{post.url}'>.</a>"
+        message += f"<a href='{post.url}'>Читати на Druzi.ca</a>"
             
         return message 
