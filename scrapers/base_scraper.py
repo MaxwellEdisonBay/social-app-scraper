@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from datetime import datetime
 import os
 from handlers.db_handler import DatabaseHandler
@@ -66,7 +66,7 @@ class BaseScraper(ABC):
             return []
 
     @abstractmethod
-    def fetch_post_full_text(self, url: str) -> Optional[str]:
+    def fetch_post_full_text(self, url: str) -> Tuple[str, Optional[str]]:
         """
         Scrapes the full text content of a specific news article.
         Must be implemented by child classes to handle site-specific article scraping.
@@ -75,6 +75,6 @@ class BaseScraper(ABC):
             url (str): The URL of the article to scrape
             
         Returns:
-            Optional[str]: The article text if successful, None if failed
+            Tuple[str, Optional[str]]: The article text and image URL if successful, None if failed
         """
         pass

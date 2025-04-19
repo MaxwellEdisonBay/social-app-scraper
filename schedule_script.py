@@ -132,7 +132,10 @@ async def process_news_queue():
                         # Fetch full text if not already present
                         if not post.full_text:
                             logger.info(f"Fetching full text for: {post.title}")
-                            post.full_text = scraper.fetch_post_full_text(post.url)
+                            full_text, image_url = scraper.fetch_post_full_text(post.url)
+                            post.full_text = full_text
+                            if image_url:  # Update image URL if one was found
+                                post.image_url = image_url
                             news_queue.db_handler.update_post(post)
                         
                         # Get translations with cooldown to respect API limits

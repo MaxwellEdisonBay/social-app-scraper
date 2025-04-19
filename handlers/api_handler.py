@@ -121,6 +121,30 @@ class APIHandler:
                 # If no HTML, use as is
                 uk_text_plain = post.uk_text
             
+        # Generate a slug from the title
+        import re
+        import hashlib
+        from datetime import datetime
+        
+        # Use English title if available, otherwise use the original title
+        title_to_slug = post.en_title if hasattr(post, 'en_title') and post.en_title else post.title
+        
+        # Convert to lowercase and replace spaces with hyphens
+        slug = title_to_slug.lower()
+        # Remove special characters and replace spaces with hyphens
+        slug = re.sub(r'[^a-z0-9\s-]', '', slug)
+        slug = re.sub(r'\s+', '-', slug)
+        # Remove multiple hyphens
+        slug = re.sub(r'-+', '-', slug)
+        # Trim hyphens from start and end
+        slug = slug.strip('-')
+        
+        # Add a timestamp to ensure uniqueness
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        # Add a hash of the URL to ensure uniqueness
+        url_hash = hashlib.md5(post.url.encode()).hexdigest()[:8]
+        slug = f"{slug}-{timestamp}-{url_hash}"
+            
         # Map the post to API format
         api_post = {
             'text': en_text_plain,  # Plain text version
@@ -135,7 +159,8 @@ class APIHandler:
             'titleUk': post.uk_title if hasattr(post, 'uk_title') else None,
             'mediaUrls': [],  # Empty array by default, will be populated after successful image upload
             'newsOriginalUrl': post.url,
-            'newsSource': post.source if hasattr(post, 'source') else None
+            'newsSource': post.source if hasattr(post, 'source') else None,
+            'slug': slug  # Add the generated slug
         }
         
         # Remove None values from optional fields

@@ -29,7 +29,72 @@ class TelegramHandler:
         else:
             self.enabled = True
             self.bot = Bot(token=self.token)
+            # Initialize admin channels list from environment variable
+            env_channels = os.getenv("TELEGRAM_ADMIN_CHANNELS", "")
+            self._admin_channels = {int(channel.strip()) for channel in env_channels.split(",") if channel.strip()}
+            logger.info(f"Initialized with admin channels from environment: {self._admin_channels}")
+            # Try to load additional channels from file
+            self._load_admin_channels()
             
+    def _load_admin_channels(self):
+        """Load admin channels from a file."""
+        try:
+            if os.path.exists('admin_channels.txt'):
+                with open('admin_channels.txt', 'r') as f:
+                    channels = f.read().strip().split('\n')
+                    self._admin_channels = set(int(c) for c in channels if c)
+                    logger.info(f"Loaded {len(self._admin_channels)} admin channels from file")
+        except Exception as e:
+            logger.error(f"Error loading admin channels: {e}")
+            self._admin_channels = set()
+
+    def _save_admin_channels(self):
+        """Save admin channels to a file."""
+        try:
+            with open('admin_channels.txt', 'w') as f:
+                f.write('\n'.join(str(c) for c in self._admin_channels))
+            logger.info(f"Saved {len(self._admin_channels)} admin channels to file")
+        except Exception as e:
+            logger.error(f"Error saving admin channels: {e}")
+
+    def add_admin_channel(self, channel_id: int) -> bool:
+        """
+        Add a channel to the list of admin channels.
+        
+        Args:
+            channel_id (int): The channel ID to add
+            
+        Returns:
+            bool: True if added successfully, False otherwise
+        """
+        try:
+            self._admin_channels.add(channel_id)
+            self._save_admin_channels()
+            logger.info(f"Added channel {channel_id} to admin channels")
+            return True
+        except Exception as e:
+            logger.error(f"Error adding admin channel: {e}")
+            return False
+
+    def remove_admin_channel(self, channel_id: int) -> bool:
+        """
+        Remove a channel from the list of admin channels.
+        
+        Args:
+            channel_id (int): The channel ID to remove
+            
+        Returns:
+            bool: True if removed successfully, False otherwise
+        """
+        try:
+            self._admin_channels.discard(channel_id)
+            self._save_admin_channels()
+            logger.info(f"Removed channel {channel_id} from admin channels")
+            return True
+        except Exception as e:
+            logger.error(f"Error removing admin channel: {e}")
+            return False
+
     def _clean_html(self, text: str) -> str:
         """
         Clean HTML from text to make it compatible with Telegram's HTML parser.
@@ -72,18 +137,8 @@ class TelegramHandler:
             return []
             
         try:
-            # Get bot's information
-            bot_info = await self.bot.get_me()
-            # Get updates to find channels
-            updates = await self.bot.get_updates()
-            
-            admin_channels = []
-            for update in updates:
-                if update.my_chat_member and update.my_chat_member.chat.type in ['channel', 'supergroup']:
-                    if update.my_chat_member.new_chat_member.status in ['administrator', 'creator']:
-                        admin_channels.append(update.my_chat_member.chat.id)
-            
-            return list(set(admin_channels))  # Remove duplicates
+            # Return the stored admin channels
+            return list(self._admin_channels)
         except Exception as e:
             logger.error(f"Error getting admin channels: {e}")
             return []

@@ -195,7 +195,7 @@ class IRCCScraper(BaseScraper):
             logger.error(f"Error fetching IRCC news: {e}")
             return []
 
-    def fetch_post_full_text(self, url: str) -> Optional[str]:
+    def fetch_post_full_text(self, url: str) -> Tuple[Optional[str], Optional[str]]:
         """
         Scrapes the full text content of an IRCC news article.
         
@@ -203,122 +203,82 @@ class IRCCScraper(BaseScraper):
             url (str): The URL of the article to scrape
             
         Returns:
-            Optional[str]: The article text if successful, None if failed
+            Tuple[Optional[str], Optional[str]]: The article text and image URL if successful, None if failed
         """
         try:
             response = self._make_request(url)
             if not response:
-                logger.error(f"Failed to fetch article from {url}")
-                return "Article content could not be extracted."
-            
-            response.encoding = 'utf-8'
+                logger.error("Failed to fetch article page")
+                return None, None
             
             soup = BeautifulSoup(response.text, 'html.parser')
-            text_content = []
             
-            # Find the news release container
-            news_container = soup.find('div', id='news-release-container')
-            if not news_container:
-                logger.warning("Could not find news release container")
-                return "Article content could not be extracted."
+            # Extract the main content - try multiple selectors
+            article_content = None
+            content_selectors = [
+                ('div', {'id': 'news-release-container'}),  # Primary selector
+                ('div', {'role': 'main'}),  # Fallback selector
+                ('article', {'class': 'news-release'})  # Another possible selector
+            ]
             
-            # Extract the title
-            title_elem = news_container.find('h1', property='name headline')
-            if title_elem:
-                title_text = title_elem.get_text().strip()
-                text_content.append(f"# {title_text}")
+            for tag, attrs in content_selectors:
+                article_content = soup.find(tag, attrs)
+                if article_content:
+                    logger.info(f"Found content using selector: {tag}, {attrs}")
+                    break
             
-            # Extract the byline
-            byline_elem = news_container.find('p', class_='gc-byline')
-            if byline_elem:
-                byline_text = byline_elem.get_text().strip()
-                text_content.append(f"_{byline_text}_")
+            if not article_content:
+                logger.error("Could not find main content")
+                return None, None
             
-            # Extract the teaser
-            teaser_elem = news_container.find('p', class_='teaser')
-            if teaser_elem:
-                teaser_text = teaser_elem.get_text().strip()
-                text_content.append(f"**{teaser_text}**")
+            # Extract all relevant text elements
+            text_elements = []
             
-            # Extract the main content
-            content_div = news_container.find('div', class_='cmp-text')
-            if content_div:
-                paragraphs = content_div.find_all('p')
-                for p in paragraphs:
-                    text = p.get_text().strip()
-                    if text and len(text) > 10:  # Skip very short lines
-                        # Clean up the text
-                        text = text.replace('\n', ' ').replace('\r', ' ')
-                        text = ' '.join(text.split())  # Normalize whitespace
-                        text_content.append(text)
+            # Get the title
+            title = article_content.find('h1')
+            if title:
+                text_elements.append(title.get_text().strip())
             
-            # Extract quotes
-            for h2 in news_container.find_all('h2'):
-                if h2.get_text().strip() == 'Quotes':
-                    blockquote = h2.find_next('blockquote')
-                    if blockquote:
-                        text_content.append("\n**Quotes:**")
-                        quotes = blockquote.find_all('p')
-                        for quote in quotes:
-                            text = quote.get_text().strip()
-                            if text:
-                                text_content.append(f"> {text}")
-                        break
+            # Get the date and location
+            date_location = article_content.find('div', class_='cmp-text')
+            if date_location:
+                text_elements.append(date_location.get_text().strip())
             
-            # Extract quick facts
-            for h2 in news_container.find_all('h2'):
-                if h2.get_text().strip() == 'Quick facts':
-                    facts_list = h2.find_next('ul')
-                    if facts_list:
-                        text_content.append("\n**Quick Facts:**")
-                        facts = facts_list.find_all('li')
-                        for fact in facts:
-                            text = fact.get_text().strip()
-                            if text:
-                                text_content.append(f"- {text}")
-                        break
+            # Get all paragraphs, excluding certain sections
+            skip_sections = ['Associated links', 'Contacts']
+            current_section = None
             
-            # Extract associated links
-            links_section = news_container.find('section', class_='lnkbx')
-            if links_section:
-                links = links_section.find_all('a')
-                if links:
-                    text_content.append("\n**Associated Links:**")
-                    for link in links:
-                        text = link.get_text().strip()
-                        href = link.get('href', '')
-                        if text and href:
-                            # No need to add base URL as links already contain full URLs
-                            text_content.append(f"- [{text}]({href})")
+            for element in article_content.find_all(['p', 'h2', 'li']):
+                # Check if this is a section header
+                if element.name == 'h2':
+                    current_section = element.get_text().strip()
+                    if current_section not in skip_sections:
+                        text_elements.append(current_section)
+                    continue
+                
+                # Skip elements in excluded sections
+                if current_section in skip_sections:
+                    continue
+                
+                # Skip elements with certain classes
+                skip_classes = ['visually-hidden', 'sr-only', 'hidden', 'gc-byline']
+                if any(cls in element.get('class', []) for cls in skip_classes):
+                    continue
+                
+                text = element.get_text().strip()
+                if text:
+                    text_elements.append(text)
             
-            # Extract contacts
-            for h2 in news_container.find_all('h2'):
-                if h2.get_text().strip() == 'Contacts':
-                    contacts = h2.find_next('p')
-                    if contacts:
-                        text_content.append("\n**Contacts:**")
-                        contact_text = ''
-                        current = contacts
-                        while current and current.name == 'p':
-                            text = current.get_text().strip()
-                            if text:
-                                contact_text += text + '\n'
-                            current = current.find_next('p')
-                        if contact_text:
-                            text_content.append(contact_text.strip())
-                        break
+            if not text_elements:
+                logger.error("No text content found")
+                return None, None
             
-            # Join all text content with double newlines
-            final_text = '\n\n'.join(text_content)
-            
-            # If we still don't have any text, return a default message
-            if not final_text:
-                logger.warning("No text content extracted from article")
-                return "Article content could not be extracted."
-            
+            final_text = '\n\n'.join(text_elements)
             logger.info(f"Successfully extracted {len(final_text)} characters of text")
-            return final_text
+            
+            # IRCC articles don't have images
+            return final_text, None
             
         except Exception as e:
-            logger.error(f"Error fetching IRCC article text: {e}")
-            return None 
+            logger.error(f"Error fetching article: {e}")
+            return None, None 

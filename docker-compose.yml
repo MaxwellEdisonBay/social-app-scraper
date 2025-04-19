@@ -12,6 +12,13 @@ services:
     environment:
       - DB_PATH=/app/data/news_cache.db
       - NEWS_QUEUE_DB_PATH=/app/data/news_queue.db
+      - PYTHONUNBUFFERED=1
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
     healthcheck:
       test: ["CMD", "python", "-c", "import os; exit(0 if os.path.exists('/app/data/news_cache.db') else 1)"]
       interval: 30s
